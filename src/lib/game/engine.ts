@@ -8,6 +8,9 @@ export interface Player {
   avatar: string;
   bot?: boolean;
   joinedAt: number;
+  /** Video games: Agora uid and whether the player asked to go live. */
+  videoUid?: number;
+  wantsLive?: boolean;
 }
 
 export interface Option {
@@ -60,6 +63,8 @@ export interface Room {
   answers: Array<Record<string, Answer>>;
   /** Round winners the host picked by hand. */
   selected: string[];
+  /** Players on air: member id → Agora uid (0 until they joined). */
+  invited: Record<string, number>;
 }
 
 export interface Standing {
@@ -158,6 +163,22 @@ function toAnswer(a: LiveAnswer | undefined, roundMs: number): Answer | undefine
 const asList = <T,>(value: T[] | Record<string, T> | undefined): T[] =>
   Array.isArray(value) ? value : value ? Object.entries(value).reduce<T[]>((l, [k, v]) => ((l[Number(k)] = v), l), []) : [];
 
+// What the app's answer screen spends before its countdown starts: question doc reads (quiz reads
+// the whole game info, so more). The app times rounds from when it got the event, not from
+// roundStartTime, so the web does the same to start together.
+const APP_LOAD_MS = { music: 600, quiz: 1200, movie: 1200 } as const;
+
+/**
+ * When the round's answering time begins on this device, mirroring the app's answer screen: a
+ * full countdown from receiving the event, unless the event is already old (a late join), in which
+ * case the round is anchored to the host's roundStartTime.
+ */
+export function roundStart(doc: GameDoc, roundStartTime: number | undefined, receivedAt: number): number {
+  if (roundStartTime === undefined) return receivedAt + PRE_ROUND_MS;
+  const late = Math.trunc(Math.abs(roundStartTime - receivedAt) / 1000) > PRE_ROUND_MS / 1000 - 1;
+  return late ? roundStartTime + PRE_ROUND_MS : receivedAt + APP_LOAD_MS[doc.gameType] + PRE_ROUND_MS;
+}
+
 /** Turns the shared game into what this device shows; `eventAt` is when this device saw the event change. */
 export function view(
   id: string,
@@ -165,6 +186,7 @@ export function view(
   live: LiveGame,
   questions: Array<Question | null>,
   eventAt: number,
+  startsAt: number,
 ): Room {
   const roundMs = doc.roundTime * 1000;
   const players: Record<string, Player> = {};
@@ -176,6 +198,8 @@ export function view(
       avatar: m.imageUrl ?? '',
       bot: pid.includes('bot_'),
       joinedAt: m.connectedSince ?? 0,
+      videoUid: m.videoUid,
+      wantsLive: m.isLiveAllowed === true,
     };
     asList(m.answers).forEach((a, i) => {
       const answer = toAnswer(a, roundMs);
@@ -204,13 +228,14 @@ export function view(
     stage,
     index,
     total: doc.questions.length,
-    startsAt: (live.roundStartTime ?? eventAt) + PRE_ROUND_MS,
+    startsAt,
     stageAt: eventAt,
     roundMs,
     round: drawn && question ? buildRound(question, drawn, doc.locale) : null,
     questions,
     answers,
     selected: asList(live.selectedUser),
+    invited: live.invitedUsers ?? {},
   };
 }
 
@@ -287,7 +312,7 @@ export function gameDoc(settings: GameSettings, admin: string, code: string, que
     locale: settings.locale,
     isPrivate: settings.isPrivate,
     gamesAmount: 1,
-    videoEnabled: false,
+    videoEnabled: settings.videoEnabled,
     demonstratedCategoryIndex: category,
     demonstratedSubcategoryIndex: Math.floor(Math.random() * (settings.categories[category]?.subcategories.length || 1)),
   };

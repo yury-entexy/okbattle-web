@@ -1,9 +1,10 @@
 'use client';
 
 import { create } from 'zustand';
+import { newVideoUid } from '@/lib/video';
 import { dataSource } from '@/lib/data/source';
 import { backend } from '@/lib/net';
-import type { Backend, GameDoc, LiveAnswer, LiveGame, LiveMember } from '@/lib/net/types';
+import { PRE_ROUND_MS, type Backend, type GameDoc, type LiveAnswer, type LiveGame, type LiveMember } from '@/lib/net/types';
 import type { GameSettings, Question } from '@/lib/types';
 import {
   gameCode,
@@ -11,6 +12,7 @@ import {
   makeBots,
   nextEvent,
   placeholder,
+  roundStart,
   planBotAnswer,
   sameAnswer,
   standings,
@@ -50,18 +52,25 @@ interface GameState {
   next(): void;
   /** Host only: advances the game; called every frame. */
   drive(): void;
+  /** Video games: a player asks to go on air (or withdraws). */
+  setWantsLive(on: boolean): void;
+  /** Host only: put a player on air or take them off (at most 4 at once, as in the app). */
+  setOnAir(playerId: string, on: boolean): void;
+  /** A player who went on air reports their Agora uid, as the app's onPlayerJoinedStream does. */
+  reportOnAir(videoUid: number): void;
   now(): number;
 }
 
 /** How long the host's device shows the answers and the standings before moving on. */
 export const ANSWERS_MS = 6000;
 export const RESULTS_MS = 5000;
-// Grace after the timer so late answers from slow phones still land, as the app's host waits 1 s.
-const ROUND_GRACE_MS = 1000;
+// Grace after the timer: phones start their round a little later (they time it from receiving the
+// event after loading the question), so their last answers still land.
+const ROUND_GRACE_MS = 2000;
 
 let be: Backend | null = null;
 let unwatch: (() => void) | null = null;
-let current: { id: string; doc: GameDoc; live: LiveGame; questions: Array<Question | null>; eventKey: string; eventAt: number } | null = null;
+let current: { id: string; doc: GameDoc; live: LiveGame; questions: Array<Question | null>; eventKey: string; eventAt: number; startsAt: number } | null = null;
 // Host-only memory: which transitions were already sent, and each bot's plan for the game.
 let issued = '';
 let bots = new Map<string, number>();
@@ -97,8 +106,10 @@ export function avatarUrl(avatar: string): string {
 
 export const isHost = (s: Pick<GameState, 'room' | 'me'>) => !!s.room && s.room.hostId === s.me.id;
 
-function member(name: string, imageUrl: string, answers: LiveAnswer[], now: number): LiveMember {
-  return { name, imageUrl, answers, winsAmount: 0, connectedSince: now, lastInGamePosition: -2, userChangedAnswer: false };
+function member(name: string, imageUrl: string, answers: LiveAnswer[], now: number, video = false): LiveMember {
+  const base = { name, imageUrl, answers, winsAmount: 0, connectedSince: now, lastInGamePosition: -2, userChangedAnswer: false };
+  // As the app's addUserToGame: video games give each member an Agora uid and start them off air.
+  return video ? { ...base, videoUid: newVideoUid(), isLiveAllowed: false } : base;
 }
 
 function liveAnswer(a: Answer): LiveAnswer {
@@ -128,8 +139,8 @@ export function losers(room: Room) {
 export const useGame = create<GameState>((set, get) => {
   function render() {
     if (!current) return;
-    const { id, doc, live, questions, eventAt } = current;
-    set({ room: view(id, doc, live, questions, eventAt), screen: 'room' });
+    const { id, doc, live, questions, eventAt, startsAt } = current;
+    set({ room: view(id, doc, live, questions, eventAt, startsAt), screen: 'room' });
   }
 
   function leave(notice = '') {
@@ -144,7 +155,7 @@ export const useGame = create<GameState>((set, get) => {
     if (doc.gameType !== 'music' && doc.gameType !== 'quiz') throw new Error('unsupported');
     const questions = await (await dataSource()).byIds(doc.gameType, doc.questions);
     unwatch?.();
-    current = { id, doc, live: { currentEvent: 'waiting', currentRound: 0 }, questions, eventKey: '', eventAt: be.now() };
+    current = { id, doc, live: { currentEvent: 'waiting', currentRound: 0 }, questions, eventKey: '', eventAt: be.now(), startsAt: 0 };
     unwatch = be.watch(id, (live) => {
       if (!current) return;
       if (!live || live.currentEvent === 'master_left') {
@@ -155,6 +166,8 @@ export const useGame = create<GameState>((set, get) => {
       if (key !== current.eventKey) {
         current.eventKey = key;
         current.eventAt = be!.now();
+        // Fixed once per event, like the app's answer screen, so later updates do not move it.
+        current.startsAt = roundStart(doc, live.roundStartTime, current.eventAt);
       }
       current.live = live;
       render();
@@ -247,7 +260,7 @@ export const useGame = create<GameState>((set, get) => {
       const doc = gameDoc(settings, me.id, code, questions.map((q) => q.id));
       const id = await be.createGame(doc);
       const members: Record<string, LiveMember> = {};
-      if (settings.isAdminPlayer) members[me.id] = member(me.name, avatarUrl(me.avatar), [], now);
+      if (settings.isAdminPlayer) members[me.id] = member(me.name, avatarUrl(me.avatar), [], now, settings.videoEnabled);
       crew.forEach((b, i) => (members[b.id] = member(b.name, avatarUrl(b.avatar), [], now + i + 1)));
       bots = new Map(crew.map((b) => [b.id, b.accuracy]));
       botWrites.clear();
@@ -287,7 +300,11 @@ export const useGame = create<GameState>((set, get) => {
         // Rounds already played count as missed, like a late joiner in the app.
         const answers = Array.isArray(existing) ? existing.slice() : [];
         for (let i = answers.length; i < (live.currentRound ?? 0) + (started ? 1 : 0); i++) answers.push(placeholder(found.doc.roundTime));
-        await be.update(found.id, { [`members/${me.id}`]: member(me.name, avatarUrl(me.avatar), answers, be.now()) });
+        const mine = member(me.name, avatarUrl(me.avatar), answers, be.now(), found.doc.videoEnabled);
+        // A returning player keeps their Agora uid, so an invitation still matches.
+        const before = live.members?.[me.id];
+        if (before?.videoUid) Object.assign(mine, { videoUid: before.videoUid, isLiveAllowed: before.isLiveAllowed ?? false });
+        await be.update(found.id, { [`members/${me.id}`]: mine });
         be.onDisconnect(found.id, `members/${me.id}`, null);
         // Drop the code from the address so leaving the room does not re-open the join screen.
         try {
@@ -313,9 +330,10 @@ export const useGame = create<GameState>((set, get) => {
       const { room, me } = get();
       if (!room?.round || !be || room.stage !== 'question' || !room.players[me.id]) return;
       if (room.answers[room.index][me.id]) return;
-      const elapsed = be.now() - room.startsAt;
-      if (elapsed < 0) return;
-      const ms = Math.min(room.roundMs, Math.round(elapsed));
+      if (be.now() < room.startsAt) return;
+      // Answer time is measured as the app measures it: from the host's roundStartTime plus the countdown.
+      const anchor = (current?.live.roundStartTime ?? room.startsAt - PRE_ROUND_MS) + PRE_ROUND_MS;
+      const ms = Math.max(0, Math.min(room.roundMs, Math.round(be.now() - anchor)));
       const round = room.round;
       const a: Answer =
         typeof choice === 'number'
@@ -345,6 +363,27 @@ export const useGame = create<GameState>((set, get) => {
 
     now() {
       return be ? be.now() : Date.now();
+    },
+
+    setWantsLive(on) {
+      const { room, me } = get();
+      if (!room || !be || !room.players[me.id]) return;
+      const patch: Record<string, unknown> = { [`members/${me.id}/isLiveAllowed`]: on };
+      if (!on && me.id in room.invited) patch[`invitedUsers/${me.id}`] = null;
+      void be.update(room.id, patch);
+    },
+
+    setOnAir(playerId, on) {
+      const { room } = get();
+      if (!room || !be || !isHost(get())) return;
+      if (on && Object.keys(room.invited).length >= 4) return;
+      void be.update(room.id, { [`invitedUsers/${playerId}`]: on ? 0 : null });
+    },
+
+    reportOnAir(videoUid) {
+      const { room, me } = get();
+      if (!room || !be || !(me.id in room.invited)) return;
+      void be.update(room.id, { [`invitedUsers/${me.id}`]: videoUid });
     },
 
     // Everything is derived from timestamps, so a throttled background tab catches up instead of drifting.

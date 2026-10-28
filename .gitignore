@@ -4,3 +4,4 @@ out
 .env*.local
 public/data/media
 public/data/catalog.json
+.api-parked

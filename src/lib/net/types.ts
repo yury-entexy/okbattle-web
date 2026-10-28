@@ -53,6 +53,10 @@ export interface LiveMember {
   lastInGamePosition?: number;
   userChangedAnswer?: boolean;
   score?: number;
+  /** Video games only: Agora uid, whether the player asked to go live, and their camera state. */
+  videoUid?: number;
+  isLiveAllowed?: boolean;
+  isCameraDisabled?: boolean;
 }
 
 export interface LiveGame {
@@ -66,6 +70,8 @@ export interface LiveGame {
   /** Round winner ids picked by the host (manual winner mode); '' for none. */
   selectedUser?: string[];
   bannedUsers?: string[];
+  /** Players the host put on air: member id → their Agora uid once they joined (0 before). */
+  invitedUsers?: Record<string, number>;
   finalResultsUsersOrder?: Record<string, number>;
 }
 

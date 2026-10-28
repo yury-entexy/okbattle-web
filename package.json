@@ -6,10 +6,11 @@
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
-    "build:demo": "NEXT_PUBLIC_DATA_SOURCE=snapshot DEMO_EXPORT=1 next build && node scripts/relativize-export.mjs",
+    "build:demo": "node scripts/build-demo.mjs && node scripts/relativize-export.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "agora-rtc-sdk-ng": "4.24.8",
     "firebase": "11.6.0",
     "next": "15.5.28",
     "react": "19.1.10",

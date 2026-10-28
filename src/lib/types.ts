@@ -72,5 +72,7 @@ export interface GameSettings {
   antiShazam: boolean;
   /** Private games get no bots. */
   isPrivate: boolean;
+  /** Live video: the host broadcasts, and can put up to 4 players on air. */
+  videoEnabled: boolean;
   bots: number;
 }

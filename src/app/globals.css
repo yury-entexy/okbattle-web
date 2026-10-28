@@ -240,3 +240,17 @@ img { max-width: 100%; display: block; }
   *, *::before, *::after { animation: none !important; transition: none !important; }
 }
 .code-input { font-size: 28px; letter-spacing: 0.3em; text-align: center; font-variant-numeric: tabular-nums; }
+
+/* Live video (games with videoEnabled) */
+.video { display: grid; gap: 8px; }
+.vtiles { display: grid; gap: 6px; grid-template-columns: 1fr 1fr; }
+.vtiles.n1 { grid-template-columns: 1fr; }
+.vtiles > :first-child { grid-column: 1 / -1; aspect-ratio: 16 / 9; }
+.vtile { position: relative; aspect-ratio: 4 / 3; border-radius: 14px; overflow: hidden; background: #24466b; }
+.vtile video { object-fit: cover; }
+.vtile-off { position: absolute; inset: 0; display: grid; place-items: center; color: #fff; opacity: 0.7; font-size: 13px; }
+.vtile-name { position: absolute; left: 8px; bottom: 6px; z-index: 1; color: #fff; font-size: 12px; text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6); }
+.video-wait { color: #fff; text-align: center; margin: 0; }
+.video-controls { display: flex; flex-wrap: wrap; gap: 6px; justify-content: center; }
+.tag.onair { border: 0; cursor: pointer; background: var(--accent, #facd62); color: #1d2b3a; }
+.tag.onair:disabled { opacity: 0.5; cursor: default; }

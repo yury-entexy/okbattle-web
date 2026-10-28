@@ -5,6 +5,7 @@ import { play, preload, sfx, stop } from '@/lib/audio';
 import { standings } from '@/lib/game/engine';
 import { isHost, useGame } from '@/lib/game/store';
 import { Avatar } from './Avatar';
+import { OnAirButton } from './OnAirButton';
 
 /** Re-renders every frame with the shared (server) clock; the host also advances the game here. */
 function useFrame(): number {
@@ -142,6 +143,7 @@ export function Play() {
                   <span className="pos">{i + 1}</span>
                   <Avatar name={s.player.avatar} size={36} />
                   <span className="n">{s.player.name}</span>
+                  <OnAirButton player={s.player} />
                   <span className="score">
                     {got?.correct ? '✓ ' : ''}
                     <img src="icons/coin.svg" width={18} height={18} alt="" />

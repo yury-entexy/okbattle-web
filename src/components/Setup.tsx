@@ -76,6 +76,7 @@ const DEFAULTS: Omit<GameSettings, 'type' | 'categories' | 'roundSeconds'> = {
   locale: 'ru',
   antiShazam: false,
   isPrivate: false,
+  videoEnabled: false,
   bots: 3,
 };
 
@@ -234,6 +235,12 @@ export function Setup() {
         ) : (
           <p className="muted">Время раунда в музыкальной игре: {MUSIC_SECONDS} с, как в приложении.</p>
         )}
+        <Toggle
+          label="Видеотрансляция"
+          value={s.videoEnabled}
+          onChange={(videoEnabled) => patch({ videoEnabled })}
+          hint="Вы в эфире с камерой; до 4 игроков, которые захотят, можно пригласить в эфир."
+        />
         <Toggle label="Приватная игра" value={s.isPrivate} onChange={(isPrivate) => patch({ isPrivate })} hint="В приватную игру не добавляются боты." />
       </section>
 

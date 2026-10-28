@@ -5,6 +5,7 @@ import { preload, sfx, unlockAudio } from '@/lib/audio';
 import { isHost, useGame } from '@/lib/game/store';
 import { backend } from '@/lib/net';
 import { Avatar } from './Avatar';
+import { OnAirButton } from './OnAirButton';
 
 const ANSWER_TYPES = { choose: 'выбор из 4 вариантов', enter: 'ответ вводится текстом', mixed: 'выбор и ввод вперемешку' };
 
@@ -82,6 +83,7 @@ export function Lobby() {
               <span className="tag">
                 {p.id === room.hostId ? 'ведущий' : p.bot ? 'бот' : p.id === me.id ? 'вы' : 'игрок'}
               </span>
+              <OnAirButton player={p} />
             </div>
           ))}
         </div>
