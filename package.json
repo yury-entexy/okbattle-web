@@ -1,0 +1,25 @@
+{
+  "name": "soundguess-web",
+  "version": "0.1.0",
+  "private": true,
+  "scripts": {
+    "dev": "next dev",
+    "build": "next build",
+    "start": "next start",
+    "build:demo": "NEXT_PUBLIC_DATA_SOURCE=snapshot DEMO_EXPORT=1 next build && node scripts/relativize-export.mjs",
+    "typecheck": "tsc --noEmit"
+  },
+  "dependencies": {
+    "firebase": "11.6.0",
+    "next": "15.3.3",
+    "react": "19.1.0",
+    "react-dom": "19.1.0",
+    "zustand": "5.0.4"
+  },
+  "devDependencies": {
+    "@types/node": "22.15.3",
+    "@types/react": "19.1.2",
+    "@types/react-dom": "19.1.2",
+    "typescript": "5.8.3"
+  }
+}

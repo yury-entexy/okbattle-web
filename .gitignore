@@ -1,0 +1,6 @@
+node_modules
+.next
+out
+.env*.local
+public/data/media
+public/data/catalog.json
