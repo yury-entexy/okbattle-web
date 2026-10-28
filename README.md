@@ -41,6 +41,14 @@ NEXT_PUBLIC_FIREBASE_API_KEY=... npx tsx server/eternal-host.ts quiz
 It uses the web app's own game store, so rules, bots and timing match the browsers. For local
 tests add the emulator variables above and `ETERNAL_ROUNDS=2` for short games.
 
+## Ad analytics
+
+UTM tags and click ids (`fbclid`, `gclid`, `yclid`) from the landing URL are kept per visitor and
+saved on their `Users` doc as `utm`. Counters load only when their ids are set on Vercel:
+`NEXT_PUBLIC_FB_PIXEL_ID`, `NEXT_PUBLIC_GA4_ID`, `NEXT_PUBLIC_GOOGLE_ADS_ID`, `NEXT_PUBLIC_YM_ID`.
+Goals sent to all of them: `game_join`, `game_start`, `game_finish`, `sign_up` (Facebook gets
+`GameJoin`, `GameStart`, `GameFinish` and the standard `CompleteRegistration`).
+
 ## Static demo build
 
 `public/data/` holds a snapshot of the catalog (`catalog.json` + `media/`), made by the export script

@@ -2,6 +2,7 @@
 
 import { useEffect, useRef, useState } from 'react';
 import { audioUnlocked, click, unlockAudio } from '@/lib/audio';
+import { initAnalytics, track } from '@/lib/analytics';
 import { useGame } from '@/lib/game/store';
 import { Home } from './Home';
 import { Setup } from './Setup';
@@ -52,6 +53,27 @@ function Connecting() {
   );
 }
 
+/** Conversion events: joined a game, played its first round, reached the final results. */
+function useGoals() {
+  const id = useGame((s) => s.room?.id);
+  const stage = useGame((s) => s.room?.stage);
+  const type = useGame((s) => s.room?.doc.gameType ?? '');
+  const eternal = useGame((s) => !!s.eternal);
+  const sent = useRef(new Set<string>());
+  useEffect(() => {
+    if (!id) return;
+    const once = (goal: 'game_join' | 'game_start' | 'game_finish') => {
+      const key = `${goal}:${id}`;
+      if (sent.current.has(key)) return;
+      sent.current.add(key);
+      track(goal, { game: type, room: eternal ? 'ad' : 'private' });
+    };
+    once('game_join');
+    if (stage && stage !== 'lobby') once('game_start');
+    if (stage === 'final') once('game_finish');
+  }, [id, stage, type, eternal]);
+}
+
 export function App() {
   const screen = useGame((s) => s.screen);
   const stage = useGame((s) => s.room?.stage);
@@ -59,6 +81,8 @@ export function App() {
   const video = useGame((s) => s.room?.doc.videoEnabled);
   const eternal = useGame((s) => s.eternal);
   useStageSounds(screen === 'room' ? stage : undefined, index);
+  useGoals();
+  useEffect(() => initAnalytics(), []);
   return (
     <main className="shell">
       {screen === 'home' && <Home />}

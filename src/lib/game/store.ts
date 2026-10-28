@@ -3,6 +3,7 @@
 import { create } from 'zustand';
 import { newVideoUid } from '@/lib/video';
 import { ETERNAL_CODES, guestIdentity, type EternalType } from './eternal';
+import { utm } from '@/lib/analytics';
 import { dataSource } from '@/lib/data/source';
 import { backend } from '@/lib/net';
 import { PRE_ROUND_MS, type Backend, type GameDoc, type LiveAnswer, type LiveGame, type LiveMember } from '@/lib/net/types';
@@ -114,6 +115,12 @@ export function avatarUrl(avatar: string): string {
   // The server host has no page address; it names the deployed site instead.
   const base = typeof location !== 'undefined' ? location.href : process.env.SITE_URL ?? 'https://okbattle-web.vercel.app/';
   return new URL(`avatars/${avatar}.webp`, base).href;
+}
+
+/** The visitor's ad tags, kept on their Users doc for attribution. */
+function adTags() {
+  const tags = utm();
+  return Object.keys(tags).length ? { utm: tags } : {};
 }
 
 export const isHost = (s: Pick<GameState, 'room' | 'me'>) => !!s.room && s.room.hostId === s.me.id;
@@ -270,7 +277,7 @@ export const useGame = create<GameState>((set, get) => {
       const now = be.now();
       const crew = settings.isPrivate ? [] : makeBots(settings.bots);
       await Promise.all([
-        be.saveUser(me.id, { name: me.name, avatarUrl: avatarUrl(me.avatar) }),
+        be.saveUser(me.id, { name: me.name, avatarUrl: avatarUrl(me.avatar), ...adTags() }),
         ...crew.map((b) => be!.saveUser(b.id, { name: b.name, avatarUrl: avatarUrl(b.avatar), isBot: true })),
       ]);
       const doc = gameDoc(settings, me.id, code, questions.map((q) => q.id));
@@ -310,7 +317,7 @@ export const useGame = create<GameState>((set, get) => {
           set({ notice: 'Ведущий не пускает вас в эту комнату.' });
           return false;
         }
-        await be.saveUser(me.id, { name: me.name, avatarUrl: avatarUrl(me.avatar) });
+        await be.saveUser(me.id, { name: me.name, avatarUrl: avatarUrl(me.avatar), ...adTags() });
         const started = live.currentEvent !== 'waiting' && live.currentEvent !== 'repeat_game_waiting';
         const existing = live.members?.[me.id]?.answers ?? [];
         // Rounds already played count as missed, like a late joiner in the app.

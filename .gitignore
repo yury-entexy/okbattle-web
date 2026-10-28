@@ -5,3 +5,4 @@ out
 public/data/media
 public/data/catalog.json
 .api-parked
+tsconfig.tsbuildinfo
