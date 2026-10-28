@@ -2,6 +2,7 @@
 
 import { create } from 'zustand';
 import { newVideoUid } from '@/lib/video';
+import { ETERNAL_CODES, guestIdentity, type EternalType } from './eternal';
 import { dataSource } from '@/lib/data/source';
 import { backend } from '@/lib/net';
 import { PRE_ROUND_MS, type Backend, type GameDoc, type LiveAnswer, type LiveGame, type LiveMember } from '@/lib/net/types';
@@ -21,7 +22,7 @@ import {
   type Room,
 } from './engine';
 
-export type Screen = 'home' | 'setup' | 'join' | 'room';
+export type Screen = 'home' | 'setup' | 'join' | 'eternal' | 'room';
 
 interface Me {
   id: string;
@@ -35,14 +36,19 @@ interface GameState {
   room: Room | null;
   /** Set when the game ended under a guest (host left) or a join failed. */
   notice: string;
+  /** The always-on room this visitor came to from an ad link; they follow it from game to game. */
+  eternal: EternalType | null;
 
   setName(name: string): void;
   setAvatar(avatar: string): void;
   goSetup(): void;
   goJoin(): void;
   goHome(): void;
-  createRoom(settings: GameSettings, questions: Question[]): Promise<void>;
+  /** `code` fixes the room code, as the always-on rooms do. */
+  createRoom(settings: GameSettings, questions: Question[], code?: string): Promise<void>;
   joinRoom(code: string): Promise<boolean>;
+  /** Ad link: straight into the always-on room of this type, under a random name for new visitors. */
+  playEternal(type: EternalType): Promise<void>;
   start(): void;
   /** A tapped option index, or typed text in `enter` rounds. */
   answer(choice: number | string): void;
@@ -105,7 +111,9 @@ const savedName = () => storage('local')?.getItem('sg.name') || 'Игрок';
 /** Absolute, so phones can load web avatars too. */
 export function avatarUrl(avatar: string): string {
   if (!avatar || /^https?:/.test(avatar)) return avatar;
-  return new URL(`avatars/${avatar}.webp`, location.href).href;
+  // The server host has no page address; it names the deployed site instead.
+  const base = typeof location !== 'undefined' ? location.href : process.env.SITE_URL ?? 'https://okbattle-web.vercel.app/';
+  return new URL(`avatars/${avatar}.webp`, base).href;
 }
 
 export const isHost = (s: Pick<GameState, 'room' | 'me'>) => !!s.room && s.room.hostId === s.me.id;
@@ -163,7 +171,10 @@ export const useGame = create<GameState>((set, get) => {
     unwatch = be.watch(id, (live) => {
       if (!current) return;
       if (!live || live.currentEvent === 'master_left') {
-        leave(isHost(get()) ? '' : 'Ведущий завершил игру.');
+        // In an always-on room the next game is already running: move on to it.
+        const again = isHost(get()) ? null : get().eternal;
+        leave(isHost(get()) || again ? '' : 'Ведущий завершил игру.');
+        if (again) void get().playEternal(again);
         return;
       }
       const key = `${live.currentEvent}#${live.currentRound}`;
@@ -216,6 +227,7 @@ export const useGame = create<GameState>((set, get) => {
     me: { id: '', name: 'Игрок', avatar: 'wolf' },
     room: null,
     notice: '',
+    eternal: null,
 
     setName(name) {
       storage('local')?.setItem('sg.name', name);
@@ -247,14 +259,14 @@ export const useGame = create<GameState>((set, get) => {
         }
       }
       leave();
-      set({ screen: 'home' });
+      set({ screen: 'home', eternal: null });
     },
 
-    async createRoom(settings, questions) {
+    async createRoom(settings, questions, fixedCode) {
       be ??= await backend();
       const { me } = get();
-      let code = gameCode();
-      for (let i = 0; i < 5 && (await be.findGame(code)); i++) code = gameCode();
+      let code = fixedCode ?? gameCode();
+      for (let i = 0; i < 5 && !fixedCode && (await be.findGame(code)); i++) code = gameCode();
       const now = be.now();
       const crew = settings.isPrivate ? [] : makeBots(settings.bots);
       await Promise.all([
@@ -319,6 +331,24 @@ export const useGame = create<GameState>((set, get) => {
       } catch {
         set({ notice: 'Не получилось войти. Если это игра про кино, на вебе её пока нет; иначе попробуйте ещё раз.' });
         return false;
+      }
+    },
+
+    async playEternal(type) {
+      const s = get();
+      // A returning visitor keeps their name; a new one plays as a random guest until they sign up.
+      const known = !!storage('local')?.getItem('sg.name');
+      const guest = known ? null : guestIdentity();
+      const me = { ...s.me, id: s.me.id || playerId(), ...(guest ?? {}) };
+      if (guest) {
+        storage('local')?.setItem('sg.name', guest.name);
+        storage('local')?.setItem('sg.avatar', guest.avatar);
+      }
+      set({ eternal: type, screen: 'eternal', notice: '', me });
+      while (get().eternal === type && get().screen === 'eternal') {
+        if (await get().joinRoom(ETERNAL_CODES[type])) return;
+        set({ screen: 'eternal', notice: 'Игра вот-вот начнётся…' });
+        await new Promise((r) => setTimeout(r, 3000));
       }
     },
 

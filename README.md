@@ -24,6 +24,23 @@ npm run dev
 `NEXT_PUBLIC_DATA_SOURCE=firebase` reads live data from Firestore with `firebase/firestore/lite`
 (no realtime listeners, a much smaller bundle). The SDK only loads when the setup screen asks for categories.
 
+## Always-on rooms for ads
+
+`/?play=music` and `/?play=quiz` drop a visitor straight into a running game under a random guest
+name (`Гость 1234`), no sign-up. Each link's room keeps a fixed code (music `700001`, quiz `700002`),
+so app players can join it too. When a game ends, its players see the results for 10 s and then
+move on to the next game, which is already running.
+
+The rooms are driven by a server host that never leaves, one process per game type:
+
+```bash
+NEXT_PUBLIC_FIREBASE_API_KEY=... npx tsx server/eternal-host.ts music
+NEXT_PUBLIC_FIREBASE_API_KEY=... npx tsx server/eternal-host.ts quiz
+```
+
+It uses the web app's own game store, so rules, bots and timing match the browsers. For local
+tests add the emulator variables above and `ETERNAL_ROUNDS=2` for short games.
+
 ## Static demo build
 
 `public/data/` holds a snapshot of the catalog (`catalog.json` + `media/`), made by the export script

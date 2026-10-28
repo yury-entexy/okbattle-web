@@ -3,13 +3,14 @@
 import { useEffect, useState } from 'react';
 import { click, preloadSounds, unlockAudio } from '@/lib/audio';
 import { AVATARS } from '@/lib/game/engine';
+import { isEternalType } from '@/lib/game/eternal';
 import { useGame } from '@/lib/game/store';
 import { Avatar } from './Avatar';
 import { ActionButton, AppBar, Header } from './ui';
 
 /** The app's main page: logo header, «Войти в игру как игрок» and «Создать игру как ведущий». */
 export function Home() {
-  const { me, setName, setAvatar, goSetup, goJoin, notice } = useGame();
+  const { me, setName, setAvatar, goSetup, goJoin, playEternal, notice } = useGame();
   const [name, setLocalName] = useState(me.name);
 
   useEffect(() => {
@@ -20,9 +21,12 @@ export function Home() {
       if (face && AVATARS.includes(face)) setAvatar(face);
     } catch {}
     preloadSounds();
+    // An ad link (`?play=music`) goes straight into the always-on room of that game.
+    const play = new URLSearchParams(location.search).get('play');
+    if (isEternalType(play)) void playEternal(play);
     // A shared link carries the room code in the hash: go straight to joining.
-    if (/^#\d{6}$/.test(location.hash)) goJoin();
-  }, [goJoin, setAvatar]);
+    else if (/^#\d{6}$/.test(location.hash)) goJoin();
+  }, [goJoin, setAvatar, playEternal]);
 
   const go = (next: () => void) => {
     unlockAudio();

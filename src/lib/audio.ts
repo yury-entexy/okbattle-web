@@ -9,6 +9,8 @@ const buffers = new Map<string, Promise<AudioBuffer | null>>();
 const elements = new Map<string, HTMLAudioElement>();
 let playing: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
 let playingElement: HTMLAudioElement | null = null;
+// A snippet the browser refused to start before the first tap; the tap starts it.
+let blocked: HTMLAudioElement | null = null;
 
 function element(url: string): HTMLAudioElement {
   let el = elements.get(url);
@@ -30,6 +32,13 @@ function context(): AudioContext {
 export function unlockAudio(): void {
   const c = context();
   if (c.state === 'suspended') void c.resume();
+  if (blocked && blocked === playingElement) void blocked.play().catch(() => {});
+  blocked = null;
+}
+
+/** False until the page may play sound (the browser wants a tap first). */
+export function audioUnlocked(): boolean {
+  return !!ctx && ctx.state === 'running';
 }
 
 export function preload(url: string): Promise<AudioBuffer | null> {
@@ -55,7 +64,9 @@ export async function play(url: string, volume = 1): Promise<void> {
     el.volume = volume;
     el.currentTime = 0;
     playingElement = el;
-    await el.play().catch(() => {});
+    await el.play().catch(() => {
+      blocked = el;
+    });
     return;
   }
   const c = context();

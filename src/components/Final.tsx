@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { click, stop } from '@/lib/audio';
+import { ETERNAL_FINAL_MS } from '@/lib/game/eternal';
 import { isHost, losers, useGame } from '@/lib/game/store';
 import { punishmentText } from '@/lib/punishments';
 import { ResultCard, rows, type Row } from './Standings';
@@ -33,10 +34,17 @@ function Podium({ row, place }: { row?: Row; place: 0 | 1 | 2 }) {
 
 /** The app's final results: pedestal in the header, fireworks, standings and the punishment. */
 export function Final() {
-  const { room, me, goSetup, goHome } = useGame();
+  const { room, me, goSetup, goHome, eternal, now } = useGame();
   const host = useGame(isHost);
   const [dialog, setDialog] = useState(false);
   const [fireworks, setFireworks] = useState(true);
+  const [, tick] = useState(0);
+  // Always-on rooms: a countdown to the next game, which the players join on their own.
+  useEffect(() => {
+    if (!eternal) return;
+    const t = setInterval(() => tick((n) => n + 1), 1000);
+    return () => clearInterval(t);
+  }, [eternal]);
 
   useEffect(() => {
     stop(1200);
@@ -69,6 +77,9 @@ export function Final() {
           </div>
         </Header>
         <div className="results-body">
+          {eternal && (
+            <p className="notice">Следующая игра через {Math.max(1, Math.ceil((room.stageAt + ETERNAL_FINAL_MS - now()) / 1000))} сек</p>
+          )}
           <p className="results-head">Итоговые результаты<small> Вопрос {room.total} из {room.total}</small></p>
           {table.map((r, i) => <ResultCard key={r.player.id} row={r} me={r.player.id === me.id} byTime={byTime} index={i} />)}
         </div>
