@@ -60,6 +60,18 @@ function useTurnTimer(room: DurakRoom, now: () => number) {
   return Math.max(0, TURN_MS - (now() - (room.changedAt ?? now())));
 }
 
+/** Ad tables: the server deals at `at`; until it sets a time, players are still being seated. */
+function NextIn({ at, label }: { at?: number; label: string }) {
+  const now = useGame((s) => s.now);
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const t = setInterval(() => tick((n) => n + 1), 500);
+    return () => clearInterval(t);
+  }, []);
+  if (!at) return <>Собираем игроков за стол…</>;
+  return <>{label} {Math.max(1, Math.ceil((at - now()) / 1000))} сек</>;
+}
+
 function Lobby({ room, host }: { room: DurakRoom; host: boolean }) {
   const { start, setOptions } = useDurak();
   const [copied, setCopied] = useState(false);
@@ -129,7 +141,7 @@ function Lobby({ room, host }: { room: DurakRoom; host: boolean }) {
             {total < 2 ? 'Нужен ещё игрок или бот' : 'Начать игру'}
           </ActionButton>
         ) : (
-          <p className="wait-text">Ждём, когда создатель начнёт игру…</p>
+          <p className="wait-text">{room.eternal ? <NextIn at={room.nextAt} label="Раздаём через" /> : 'Ждём, когда создатель начнёт игру…'}</p>
         )}
       </div>
     </>
@@ -296,6 +308,7 @@ function Over({ room, host }: { room: DurakRoom; host: boolean }) {
         ))}
         {s.fool && <div className="await-item fool"><span>{name(s.fool)}</span><small>остался с картами</small></div>}
       </div>
+      {room.eternal && <p className="notice"><NextIn at={room.nextAt} label="Следующая партия через" /></p>}
       {host && <ActionButton primary onClick={() => { click('startGame'); start(); }}>Ещё партию</ActionButton>}
       <ActionButton onClick={leave}>Выйти</ActionButton>
     </div>

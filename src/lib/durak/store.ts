@@ -3,56 +3,30 @@
 import { create } from 'zustand';
 import { backend } from '@/lib/net';
 import type { Backend } from '@/lib/net/types';
-import { AVATARS } from '@/lib/game/engine';
 import { avatarUrl, useGame } from '@/lib/game/store';
-import { botMove } from './bot';
-import { boutOver, deal, legal, normalize, play, settle, waitingOn, type DurakState, type Mode, type Move } from './rules';
+import { guestIdentity } from '@/lib/game/eternal';
+import { legal, play, type DurakState, type Mode, type Move } from './rules';
+import { MAX_PLAYERS, nodeId, refereeStep, startPatch, view, type DurakMember, type DurakRoom } from './room';
+
+export { MAX_PLAYERS, TURN_MS, type DurakMember, type DurakRoom } from './room';
 
 /**
  * Online «Дурак» rooms. A room lives in the Realtime Database at `Games/durak_{code}` (see
- * docs/durak-protocol.md); the mobile app never reads ids with this prefix. The host's device is the
+ * docs/durak-protocol.md); the mobile app never reads ids with this prefix. The host is the
  * referee: players post their moves under `moves/`, and the host checks each one, applies it to
- * `state` and plays for the bots.
+ * `state` and plays for the bots. The host is a player's browser, or the server for ad tables.
  */
-export interface DurakMember {
-  name: string;
-  avatar: string;
-  bot?: boolean;
-  joinedAt: number;
-  /** The player closed the page; the bot logic plays their turns. */
-  left?: boolean;
-}
 
-export interface DurakRoom {
-  kind: 'durak';
-  code: string;
-  hostId: string;
-  mode: Mode;
-  bots: number;
-  status: 'lobby' | 'playing' | 'over' | 'closed';
-  members: Record<string, DurakMember>;
-  state?: DurakState;
-  moves?: Record<string, { by: string; move: Move; at: number }>;
-  /** Server time of the last state change, for the bots' pace and the turn timer. */
-  changedAt?: number;
-  createdAt: number;
-}
-
-export const MAX_PLAYERS = 5;
-/** A player who doesn't move in this time is moved for: they take, lead their lowest card or pass. */
-export const TURN_MS = 30_000;
-const BOT_MS = [700, 1500];
-const SETTLE_MS = 1100;
-
-const nodeId = (code: string) => `durak_${code}`;
-const BOT_NAMES = ['Бот Миша', 'Бот Катя', 'Бот Олег', 'Бот Аня', 'Бот Дима', 'Бот Лена'];
+/** Where the server publishes the open ad table: `{ code }`. */
+export const ETERNAL_POINTER = 'durak_eternal';
 
 interface DurakStore {
   room: DurakRoom | null;
-  notice: string;
   create(mode: Mode, bots: number): Promise<void>;
   /** 'none' if no «Дурак» room has this code; 'refused' with a notice if it can't be joined now. */
   join(code: string): Promise<'ok' | 'refused' | 'none'>;
+  /** Ad link: sit down at the server's open table, under a random name for new visitors. */
+  playEternal(): Promise<void>;
   setOptions(patch: { mode?: Mode; bots?: number }): void;
   start(): void;
   move(move: Move): void;
@@ -67,10 +41,7 @@ let botDue = new Map<string, number>();
 
 const me = () => useGame.getState().me;
 const isHostOf = (room: DurakRoom | null) => !!room && room.hostId === me().id;
-
-function view(raw: DurakRoom): DurakRoom {
-  return { ...raw, members: raw.members ?? {}, state: raw.state ? normalize(raw.state) : undefined };
-}
+const sleep = (ms: number) => new Promise((r) => setTimeout(r, ms));
 
 export const useDurak = create<DurakStore>((set, get) => {
   function watch(code: string) {
@@ -80,7 +51,8 @@ export const useDurak = create<DurakStore>((set, get) => {
       if (!room || room.status === 'closed') {
         const was = get().room;
         stop();
-        if (was && !isHostOf(was)) useGame.setState({ screen: 'home', notice: 'Ведущий завершил игру.' });
+        if (was?.eternal) void get().playEternal();
+        else if (was && !isHostOf(was)) useGame.setState({ screen: 'home', notice: 'Ведущий завершил игру.' });
         return;
       }
       set({ room: view(room) });
@@ -99,12 +71,6 @@ export const useDurak = create<DurakStore>((set, get) => {
     if (room) void be!.update(nodeId(room.code), patch);
   }
 
-  function commit(state: DurakState) {
-    write({ state, changedAt: be!.now(), ...(state.over ? { status: 'over' } : {}) });
-    // Apply locally at once so the next tick doesn't act on the old state.
-    set((s) => (s.room ? { room: { ...s.room, state, changedAt: be!.now(), status: state.over ? 'over' : s.room.status } } : s));
-  }
-
   function self(): DurakMember {
     const { name, avatar } = me();
     return { name, avatar: avatarUrl(avatar), joinedAt: be!.now() };
@@ -112,7 +78,6 @@ export const useDurak = create<DurakStore>((set, get) => {
 
   return {
     room: null,
-    notice: '',
 
     async create(mode, bots) {
       be ??= await backend();
@@ -142,8 +107,7 @@ export const useDurak = create<DurakStore>((set, get) => {
           useGame.setState({ notice: 'Игра в «Дурака» уже идёт. Дождитесь следующей.' });
           return 'refused';
         }
-        const humans = Object.values(room.members).filter((m) => !m.bot).length;
-        if (humans >= MAX_PLAYERS) {
+        if (Object.values(room.members).filter((m) => !m.bot).length >= MAX_PLAYERS) {
           useGame.setState({ notice: 'В комнате уже 5 игроков.' });
           return 'refused';
         }
@@ -157,6 +121,28 @@ export const useDurak = create<DurakStore>((set, get) => {
       return 'ok';
     },
 
+    async playEternal() {
+      be ??= await backend();
+      const game = useGame.getState();
+      // As in the quiz ad rooms: a returning visitor keeps their name, a new one plays as a guest.
+      if (!localStorage.getItem('sg.name')) {
+        const guest = guestIdentity();
+        localStorage.setItem('sg.name', guest.name);
+        localStorage.setItem('sg.avatar', guest.avatar);
+        game.setAvatar(guest.avatar);
+        game.setName(guest.name);
+      } else {
+        game.setName(localStorage.getItem('sg.name')!);
+      }
+      useGame.setState({ eternal: 'durak', screen: 'eternal', notice: '' });
+      while (useGame.getState().eternal === 'durak' && useGame.getState().screen === 'eternal') {
+        const pointer = (await be.read(ETERNAL_POINTER)) as unknown as { code?: string } | null;
+        if (pointer?.code && (await get().join(pointer.code)) === 'ok') return;
+        useGame.setState({ screen: 'eternal', notice: 'Игра вот-вот начнётся…' });
+        await sleep(2000);
+      }
+    },
+
     setOptions(patch) {
       if (!isHostOf(get().room)) return;
       write(patch);
@@ -165,25 +151,10 @@ export const useDurak = create<DurakStore>((set, get) => {
     start() {
       const room = get().room;
       if (!room || !isHostOf(room) || room.status === 'playing') return;
-      const humans = Object.entries(room.members)
-        .filter(([, m]) => !m.bot && !m.left)
-        .sort((a, b) => a[1].joinedAt - b[1].joinedAt)
-        .slice(0, MAX_PLAYERS);
-      const botCount = Math.min(room.bots, MAX_PLAYERS - humans.length);
-      if (humans.length + botCount < 2) return;
-      const members: Record<string, DurakMember> = Object.fromEntries(humans);
-      const used = new Set(humans.map(([, m]) => m.avatar));
-      for (let i = 0; i < botCount; i++) {
-        const avatar = AVATARS.find((a) => !used.has(avatarUrl(a))) ?? AVATARS[i];
-        used.add(avatarUrl(avatar));
-        members[`bot${i}_${room.code}`] = { name: BOT_NAMES[i], avatar: avatarUrl(avatar), bot: true, joinedAt: be!.now() + i };
-      }
-      // Seats in joining order, with the bots spread between the people.
-      const bots = Object.keys(members).filter((id) => members[id].bot);
-      const seats = humans.flatMap(([id], i) => [id, ...bots.filter((_, k) => k % humans.length === i)]);
-      const state = deal(seats, room.mode);
+      const patch = startPatch(room, be!.now(), avatarUrl);
+      if (!patch) return;
       botDue = new Map();
-      write({ members, moves: null, status: 'playing', state, changedAt: be!.now() });
+      write(patch);
     },
 
     move(move) {
@@ -192,7 +163,7 @@ export const useDurak = create<DurakStore>((set, get) => {
       const id = me().id;
       if (!legal(room.state, id, move)) return;
       if (isHostOf(room)) {
-        commit(play(room.state, id, move));
+        apply({ state: play(room.state, id, move), changedAt: be!.now() });
         return;
       }
       write({ [`moves/${be!.now()}_${id}`]: { by: id, move, at: be!.now() } });
@@ -211,44 +182,32 @@ export const useDurak = create<DurakStore>((set, get) => {
         }
       }
       stop();
-      useGame.setState({ screen: 'home' });
+      useGame.setState({ screen: 'home', eternal: null });
     },
 
     drive() {
       const room = get().room;
-      if (!room || !be || !isHostOf(room) || room.status !== 'playing' || !room.state) return;
-      let state = room.state;
-      const now = be.now();
-
-      // Players' moves, oldest first; anything stale or illegal is dropped.
-      const queued = Object.entries(room.moves ?? {}).sort(([a], [b]) => (a < b ? -1 : 1));
-      if (queued.length) {
-        for (const [, m] of queued) if (legal(state, m.by, m.move)) state = play(state, m.by, m.move);
-        write(Object.fromEntries(queued.map(([key]) => [`moves/${key}`, null])));
-        set((s) => (s.room ? { room: { ...s.room, moves: undefined } } : s));
-        if (state !== room.state) return commit(state);
-      }
-
-      const since = now - (room.changedAt ?? now);
-      if (boutOver(state)) {
-        if (since >= SETTLE_MS) commit(settle(state));
-        return;
-      }
-
-      for (const id of waitingOn(state)) {
-        const member = room.members[id];
-        const away = !member || member.left;
-        if (member?.bot || away) {
-          const key = `${state.seq}:${id}`;
-          if (!botDue.has(key)) botDue.set(key, now + (away ? 400 : BOT_MS[0] + Math.random() * (BOT_MS[1] - BOT_MS[0])));
-          if (now < botDue.get(key)!) continue;
-        } else if (since < TURN_MS) {
-          continue;
-        }
-        // A bot's turn, or a person who ran out of time: the bot logic moves for them.
-        const m = botMove(state, id);
-        if (m && legal(state, id, m)) return commit(play(state, id, m));
-      }
+      if (!room || !be || !isHostOf(room)) return;
+      const patch = refereeStep(room, be.now(), botDue);
+      if (patch) apply(patch);
     },
   };
+
+  /** Writes a referee change and applies it here at once, so the next tick doesn't act on the old state. */
+  function apply(patch: Record<string, unknown>) {
+    const state = patch.state as DurakState | undefined;
+    write(state?.over ? { ...patch, status: 'over' } : patch);
+    set((s) => {
+      if (!s.room) return s;
+      const moves = { ...s.room.moves };
+      for (const key of Object.keys(patch)) if (key.startsWith('moves/')) delete moves[key.slice(6)];
+      return {
+        room: {
+          ...s.room,
+          moves,
+          ...(state ? { state, changedAt: patch.changedAt as number, status: state.over ? 'over' : s.room.status } : {}),
+        },
+      };
+    });
+  }
 });

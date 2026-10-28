@@ -39,7 +39,7 @@ interface GameState {
   /** Set when the game ended under a guest (host left) or a join failed. */
   notice: string;
   /** The always-on room this visitor came to from an ad link; they follow it from game to game. */
-  eternal: EternalType | null;
+  eternal: EternalType | 'durak' | null;
   /** The signed-in account's email, or null for a guest. */
   account: string | null;
 
@@ -188,7 +188,8 @@ export const useGame = create<GameState>((set, get) => {
       if (!current) return;
       if (!live || live.currentEvent === 'master_left') {
         // In an always-on room the next game is already running: move on to it.
-        const again = isHost(get()) ? null : get().eternal;
+        const ad = get().eternal;
+        const again = isHost(get()) || ad === 'durak' ? null : ad;
         leave(isHost(get()) || again ? '' : 'Ведущий завершил игру.');
         if (again) void get().playEternal(again);
         return;

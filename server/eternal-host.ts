@@ -54,8 +54,18 @@ async function main(t: EternalType) {
   // The host advances the game the same way a browser host does, on a short tick.
   setInterval(() => store.getState().drive(), 100);
 
+  // On shutdown (a new version deploying), end the game the way a host leaving does; the players
+  // then look for the room again and find the next server's game.
+  let stopping = false;
+  process.on('SIGTERM', () => {
+    stopping = true;
+    const id = store.getState().room?.id;
+    if (!id) process.exit(0);
+    void be.update(id, { currentEvent: 'master_left' }).then(() => be.deleteGame(id)).finally(() => setTimeout(() => process.exit(0), 500));
+  });
+
   let previous: string | null = null;
-  for (;;) {
+  while (!stopping) {
     let made: Awaited<ReturnType<typeof pickQuestions>> | null = null;
     try {
       made = await pickQuestions(t);
@@ -86,7 +96,7 @@ async function main(t: EternalType) {
     for (;;) {
       await sleep(500);
       const room = store.getState().room;
-      if (!room) break;
+      if (!room || stopping) break;
       if (room.stage === 'final') break;
     }
     previous = store.getState().room?.id ?? null;

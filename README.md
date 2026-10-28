@@ -31,15 +31,26 @@ name (`Гость 1234`), no sign-up. Each link's room keeps a fixed code (music
 so app players can join it too. When a game ends, its players see the results for 10 s and then
 move on to the next game, which is already running.
 
-The rooms are driven by a server host that never leaves, one process per game type:
+`/?play=durak` seats the visitor at the server's open «Дурак» table (its code is published at
+`Games/durak_eternal`). The table deals 4 s after the first person sits down, with bots in the empty
+seats, and a new open table takes its place; after a game the same table deals again in 10 s for
+whoever stayed.
+
+One server runs all three: `server/main.ts` starts `eternal-host.ts music`, `eternal-host.ts quiz`
+and `durak-host.ts` as child processes, restarts any that stops, and answers health checks on
+`$PORT`. The hosts use the web app's own game code, so rules, bots and timing match the browsers.
 
 ```bash
-NEXT_PUBLIC_FIREBASE_API_KEY=... npx tsx server/eternal-host.ts music
-NEXT_PUBLIC_FIREBASE_API_KEY=... npx tsx server/eternal-host.ts quiz
+NEXT_PUBLIC_FIREBASE_API_KEY=... node --import tsx server/main.ts   # ROOMS=durak to run some only
 ```
 
-It uses the web app's own game store, so rules, bots and timing match the browsers. For local
-tests add the emulator variables above and `ETERNAL_ROUNDS=2` for short games.
+For local tests add the emulator variables above and `ETERNAL_ROUNDS=2` for short games.
+
+It deploys to Cloud Run (service `okbattle-ad-rooms`, europe-west1, one always-on instance) from
+the `Dockerfile` by `.github/workflows/deploy-server.yml` on every push to `main` that touches the
+server or the game code. The workflow needs the repository secrets `GCP_SA_KEY` (a service account
+key with Cloud Run Admin, Artifact Registry Admin and Service Account User) and `FIREBASE_API_KEY`,
+and the Cloud Run and Artifact Registry APIs enabled in the project.
 
 ## Ad analytics
 
