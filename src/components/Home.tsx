@@ -1,10 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
+import { click, preloadSounds, unlockAudio } from '@/lib/audio';
 import { AVATARS } from '@/lib/game/engine';
 import { useGame } from '@/lib/game/store';
 import { Avatar } from './Avatar';
+import { ActionButton, AppBar, Header } from './ui';
 
+/** The app's main page: logo header, «Войти в игру как игрок» and «Создать игру как ведущий». */
 export function Home() {
   const { me, setName, setAvatar, goSetup, goJoin, notice } = useGame();
   const [name, setLocalName] = useState(me.name);
@@ -16,40 +19,41 @@ export function Home() {
       const face = localStorage.getItem('sg.avatar');
       if (face && AVATARS.includes(face)) setAvatar(face);
     } catch {}
+    preloadSounds();
     // A shared link carries the room code in the hash: go straight to joining.
     if (/^#\d{6}$/.test(location.hash)) goJoin();
   }, [goJoin, setAvatar]);
 
-  return (
-    <>
-      <section className="hero">
-        <img className="logo" src="icon.png" width={72} height={72} alt="" />
-        <h1>OK Battle</h1>
-        <p>Угадай песню по первым секундам или ответь на вопрос быстрее соперников. Играйте с друзьями с веба и из мобильного приложения в одной комнате.</p>
-      </section>
+  const go = (next: () => void) => {
+    unlockAudio();
+    setName(name.trim() || 'Игрок');
+    next();
+  };
 
-      <form
-        className="card"
-        onSubmit={(e) => {
-          e.preventDefault();
-          setName(name.trim() || 'Игрок');
-          goSetup();
-        }}
-      >
-        <div className="field">
-          <label className="label" htmlFor="player-name">Ваше имя в игре</label>
-          <input
-            id="player-name"
-            className="input"
-            value={name}
-            maxLength={20}
-            onChange={(e) => setLocalName(e.target.value)}
-            autoComplete="nickname"
-          />
+  return (
+    <div className="screen scroll">
+      <Header deco={['leftTop', 'centerTop', 'rightSide', 'leftSide']}>
+        <AppBar title={<span />} />
+        <div className="home-hero">
+          <img src="ui/logo.png" width={100} height={100} alt="" />
+          <h2>OK Battle</h2>
         </div>
-        <div className="field">
-          <span className="label">Аватар</span>
-          <div className="avatars">
+      </Header>
+
+      <div>
+        <div className="home-body">
+          <div className="field">
+            <label className="field-label" htmlFor="player-name">Ваше имя в игре</label>
+            <input
+              id="player-name"
+              className="input"
+              value={name}
+              maxLength={20}
+              onChange={(e) => setLocalName(e.target.value)}
+              autoComplete="nickname"
+            />
+          </div>
+          <div className="avatars" role="group" aria-label="Аватар">
             {AVATARS.map((a) => (
               <button
                 type="button"
@@ -59,28 +63,15 @@ export function Home() {
                 aria-label={a}
                 onClick={() => setAvatar(a)}
               >
-                <Avatar name={a} size={52} />
+                <Avatar name={a} size={48} />
               </button>
             ))}
           </div>
+          {notice && <p className="notice" role="alert">{notice}</p>}
+          <ActionButton onClick={() => go(() => { click('next'); goJoin(); })}>Войти в игру как игрок</ActionButton>
+          <ActionButton primary onClick={() => go(goSetup)}>Создать игру как ведущий</ActionButton>
         </div>
-        <div className="row">
-          <button className="btn" style={{ flex: 1 }} type="submit">Создать игру</button>
-          <button
-            className="btn secondary"
-            style={{ flex: 1 }}
-            type="button"
-            onClick={() => {
-              setName(name.trim() || 'Игрок');
-              goJoin();
-            }}
-          >
-            Войти по коду
-          </button>
-        </div>
-      </form>
-
-      {notice && <p className="notice" role="alert">{notice}</p>}
-    </>
+      </div>
+    </div>
   );
 }

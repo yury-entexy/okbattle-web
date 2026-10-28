@@ -48,7 +48,7 @@ interface GameState {
   answer(choice: number | string): void;
   /** Host only, typed-answer rounds with manual judging: the round winner, or null for none. */
   pickWinner(playerId: string | null): void;
-  /** Host only: skip the rest of the answers or results screen. */
+  /** Host only: end the round early, or skip the rest of the answers or results screen. */
   next(): void;
   /** Host only: advances the game; called every frame. */
   drive(): void;
@@ -67,6 +67,10 @@ export const RESULTS_MS = 5000;
 // Grace after the timer: phones start their round a little later (they time it from receiving the
 // event after loading the question), so their last answers still land.
 const ROUND_GRACE_MS = 2000;
+// When everyone has answered early, players first see the right answer on the answer screen, as
+// they would when the time runs out.
+const REVEAL_MS = 2500;
+let everyoneAt = { round: '', at: 0 };
 
 let be: Backend | null = null;
 let unwatch: (() => void) | null = null;
@@ -354,7 +358,12 @@ export const useGame = create<GameState>((set, get) => {
     next() {
       const { room } = get();
       if (!room || !be || !isHost(get())) return;
-      if (room.stage === 'answers') get().pickWinner(null);
+      // «Далее» during a round ends it early, as the app's adminHandleNext does.
+      if (room.stage === 'question' && room.round && be.now() > room.startsAt && issued !== `e${room.index}`) {
+        issued = `e${room.index}`;
+        if (room.doc.takeIntoAnswerTime) void be.update(room.id, { currentEvent: 'answers' });
+        else finishRound(room, null);
+      } else if (room.stage === 'answers') get().pickWinner(null);
       else if (room.stage === 'results' && issued !== `n${room.index}`) {
         issued = `n${room.index}`;
         nextRound(room);
@@ -418,7 +427,9 @@ export const useGame = create<GameState>((set, get) => {
         }
         if (Object.keys(patch).length) void be.update(room.id, patch);
         const everyone = Object.keys(room.players).every((pid) => answered[pid] || patch[`members/${pid}/answers/${room.index}`]);
-        if (elapsed > 0 && (everyone || elapsed >= room.roundMs + ROUND_GRACE_MS)) {
+        if (everyone && everyoneAt.round !== `${room.id}/${room.index}`) everyoneAt = { round: `${room.id}/${room.index}`, at: now };
+        const revealed = everyone && now - everyoneAt.at >= REVEAL_MS;
+        if (elapsed > 0 && (revealed || elapsed >= room.roundMs + ROUND_GRACE_MS)) {
           go(`e${room.index}`, () => {
             if (room.doc.takeIntoAnswerTime) void be!.update(room.id, { currentEvent: 'answers' });
             else finishRound(room, null);

@@ -4,6 +4,7 @@ import { useEffect, useState, type ReactNode } from 'react';
 import { preload } from '@/lib/audio';
 import { dataSource } from '@/lib/data/source';
 import { textLocale } from '@/lib/game/engine';
+import { ActionButton, AppBar, BackIcon, BlueScreen, RoundButton } from './ui';
 import { useGame } from '@/lib/game/store';
 import { PUNISHMENT_KINDS } from '@/lib/punishments';
 import type { Category, GameSettings, GameType } from '@/lib/types';
@@ -32,7 +33,7 @@ function Choice<T extends string | number>({
 }) {
   return (
     <div className="field">
-      <span className="label">{label}</span>
+      <h3>{label}</h3>
       <div className="chips">
         {options.map(([v, text]) => (
           <button key={String(v)} type="button" className="chip" aria-pressed={value === v} onClick={() => onChange(v)}>
@@ -48,7 +49,7 @@ const YES_NO: Array<[string, string]> = [['yes', 'Да'], ['no', 'Нет']];
 function Toggle({ label, value, onChange, hint }: { label: string; value: boolean; onChange(v: boolean): void; hint?: string }) {
   return (
     <div className="field">
-      <span className="label">{label}</span>
+      <h3>{label}</h3>
       <div className="chips">
         {YES_NO.map(([v, text]) => (
           <button key={v} type="button" className="chip" aria-pressed={value === (v === 'yes')} onClick={() => onChange(v === 'yes')}>
@@ -56,7 +57,7 @@ function Toggle({ label, value, onChange, hint }: { label: string; value: boolea
           </button>
         ))}
       </div>
-      {hint && <small className="muted">{hint}</small>}
+      {hint && <small className="hint">{hint}</small>}
     </div>
   );
 }
@@ -152,67 +153,57 @@ export function Setup() {
   const openCat = list?.find((c) => c.id === open);
 
   return (
-    <>
-      <header className="topbar">
-        <button className="icon-btn" onClick={goHome} aria-label="Назад">←</button>
-        <h1>Новая игра</h1>
-      </header>
+    <BlueScreen>
+      <AppBar leading={<RoundButton label="Назад" onClick={goHome}><BackIcon /></RoundButton>} title="Создать игру" />
 
-      <section className="card">
-        <p className="label">Тип игры</p>
-        <div className="modes">
-          <button className="mode" aria-pressed={type === 'music'} onClick={() => chooseType('music')}>
-            <img src="icons/music_game_type.svg" alt="" />
-            <strong>Угадай мелодию</strong>
-            <span>Звучит отрывок трека</span>
-          </button>
-          <button className="mode" aria-pressed={type === 'quiz'} onClick={() => chooseType('quiz')}>
-            <img src="icons/quiz_game_type.svg" alt="" />
-            <strong>Викторина</strong>
-            <span>Вопросы на эрудицию</span>
-          </button>
+      <p className="section-title">В какую игру хотите поиграть?</p>
+      <button className="type-btn" aria-pressed={type === 'music'} onClick={() => chooseType('music')}>
+        <img className="type-icon music" src="ui/music_game_type.svg" alt="" />
+        Музыкальная викторина
+      </button>
+      <button className="type-btn" aria-pressed={type === 'quiz'} onClick={() => chooseType('quiz')}>
+        <img className="type-icon quiz" src="ui/quiz_game_type.svg" alt="" />
+        Интеллектуальная викторина
+      </button>
+
+      <p className="section-title">Категория {subCount > 0 && `· выбрано подкатегорий: ${subCount}`}</p>
+      {!list && !error && <div className="spinner" aria-label="Загрузка" />}
+      {list && (
+        <div className="cats">
+          {list.map((c) => (
+            <button
+              key={c.id}
+              className="cat"
+              aria-pressed={!!chosen[c.id]?.length}
+              aria-expanded={open === c.id}
+              onClick={() => toggleCategory(c)}
+            >
+              {c.image && <img src={c.image} alt="" loading="lazy" />}
+              {!!chosen[c.id]?.length && <i className="check"><img src="ui/checkmark.svg" width={11} height={11} alt="" /></i>}
+              <span>{c.name[lang]}</span>
+            </button>
+          ))}
         </div>
-      </section>
-
-      <section className="card">
-        <p className="label">Категории {subCount > 0 && `· выбрано подборок: ${subCount}`}</p>
-        {!list && !error && <div className="spinner" aria-label="Загрузка" />}
-        {list && (
-          <div className="cats">
-            {list.map((c) => (
-              <button
-                key={c.id}
-                className="cat"
-                aria-pressed={!!chosen[c.id]?.length}
-                aria-expanded={open === c.id}
-                onClick={() => toggleCategory(c)}
-              >
-                {c.image && <img src={c.image} alt="" loading="lazy" />}
-                <span>{c.name[lang]}</span>
+      )}
+      {openCat && (
+        <div className="panel">
+          <h3>Выберите подкатегорию: {openCat.name[lang]}</h3>
+          <div className="chips">
+            {openCat.subcategories.map((x) => (
+              <button key={x.id} className="chip" aria-pressed={!!chosen[openCat.id]?.includes(x.id)} onClick={() => toggleSub(openCat.id, x.id)}>
+                {x.name[lang]}
+                <small>{x.size}</small>
               </button>
             ))}
           </div>
-        )}
-        {openCat && (
-          <>
-            <p className="label">Подборки «{openCat.name[lang]}»</p>
-            <div className="chips">
-              {openCat.subcategories.map((x) => (
-                <button key={x.id} className="chip" aria-pressed={!!chosen[openCat.id]?.includes(x.id)} onClick={() => toggleSub(openCat.id, x.id)}>
-                  {x.name[lang]}
-                  <small>{x.size}</small>
-                </button>
-              ))}
-            </div>
-          </>
-        )}
-      </section>
+        </div>
+      )}
 
-      <section className="card">
-        <p className="label">Настройки игры</p>
+      <p className="section-title">Настройки игры</p>
+      <div className="panel">
         <Choice label="Количество вопросов" value={s.rounds} options={AMOUNTS.map((n) => [n, n])} onChange={(rounds) => patch({ rounds })} />
         <div className="field">
-          <span className="label">Сложность</span>
+          <h3>Уровень сложности</h3>
           <div className="chips">
             {[1, 2, 3].map((level) => (
               <button
@@ -231,9 +222,9 @@ export function Setup() {
           </div>
         </div>
         {type === 'quiz' ? (
-          <Choice label="Время раунда, с" value={quizSeconds} options={QUIZ_SECONDS.map((n): [number, number] => [n, n])} onChange={(v) => setQuizSeconds(Number(v))} />
+          <Choice label="Время раунда, сек" value={quizSeconds} options={QUIZ_SECONDS.map((n): [number, number] => [n, n])} onChange={(v) => setQuizSeconds(Number(v))} />
         ) : (
-          <p className="muted">Время раунда в музыкальной игре: {MUSIC_SECONDS} с, как в приложении.</p>
+          <small className="hint">Время раунда в музыкальной игре: {MUSIC_SECONDS} сек, как в приложении.</small>
         )}
         <Toggle
           label="Видеотрансляция"
@@ -242,11 +233,10 @@ export function Setup() {
           hint="Вы в эфире с камерой; до 4 игроков, которые захотят, можно пригласить в эфир."
         />
         <Toggle label="Приватная игра" value={s.isPrivate} onChange={(isPrivate) => patch({ isPrivate })} hint="В приватную игру не добавляются боты." />
-      </section>
+      </div>
 
-      <section className="card">
-        <p className="label">Дополнительно</p>
-        <Choice
+      <p className="section-title">Дополнительно</p>
+      <div className="panel">        <Choice
           label="Тип ответа"
           value={s.answerType}
           options={[['choose', 'Выбор из вариантов'], ['enter', 'Ввод текста'], ['mixed', 'Вперемешку']]}
@@ -296,8 +286,8 @@ export function Setup() {
           onChange={(punishment) => patch({ punishment })}
         />
         <div className="field">
-          <label className="label" htmlFor="game-language">Язык игры</label>
-          <select id="game-language" className="input" value={s.locale} onChange={(e) => patch({ locale: e.target.value })}>
+          <h3><label htmlFor="game-language">Язык игры</label></h3>
+          <select id="game-language" className="input select" value={s.locale} onChange={(e) => patch({ locale: e.target.value })}>
             {LANGUAGES.map(([v, text]) => (
               <option key={v} value={v}>{text}</option>
             ))}
@@ -314,12 +304,14 @@ export function Setup() {
         {!s.isPrivate && (
           <Choice label="Боты в комнате" value={s.bots} options={[0, 1, 2, 3, 4, 5].map((n) => [n, n])} onChange={(bots) => patch({ bots })} />
         )}
-      </section>
+      </div>
 
-      {error && <p className="notice" role="alert">{error}</p>}
-      <button className="btn block" disabled={!subCount || busy} onClick={create}>
-        {busy ? 'Готовим вопросы…' : subCount ? 'Открыть комнату' : 'Выберите категорию'}
-      </button>
-    </>
+      {error && <p className="notice" role="alert" style={{ marginTop: 12 }}>{error}</p>}
+      <div className="sticky-bottom">
+        <ActionButton disabled={!subCount || busy} onClick={create}>
+          {busy ? 'Готовим вопросы…' : subCount ? 'Создать игру' : 'Выберите категорию'}
+        </ActionButton>
+      </div>
+    </BlueScreen>
   );
 }

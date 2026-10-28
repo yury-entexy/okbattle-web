@@ -1,9 +1,11 @@
 'use client';
 
 import { useState } from 'react';
-import { unlockAudio } from '@/lib/audio';
+import { click, unlockAudio } from '@/lib/audio';
 import { useGame } from '@/lib/game/store';
+import { ActionButton, AppBar, BackIcon, BlueScreen, Loader, RoundButton } from './ui';
 
+/** The app's join page: six-digit room code, then «Играть». */
 export function Join() {
   const { goHome, joinRoom, notice } = useGame();
   const [code, setCode] = useState(() => {
@@ -13,24 +15,25 @@ export function Join() {
   const [busy, setBusy] = useState(false);
 
   return (
-    <>
-      <header className="topbar">
-        <button className="icon-btn" onClick={goHome} aria-label="Назад">←</button>
-        <h1>Войти по коду</h1>
-      </header>
-      <form
-        className="card"
-        onSubmit={async (e) => {
-          e.preventDefault();
-          // The tap that joins also unlocks sound for the rounds that follow.
-          unlockAudio();
-          setBusy(true);
-          const ok = await joinRoom(code);
-          if (!ok) setBusy(false);
-        }}
-      >
-        <div className="field">
-          <label className="label" htmlFor="room-code">Код игры от ведущего</label>
+    <BlueScreen>
+      <AppBar leading={<RoundButton label="Назад" onClick={goHome}><BackIcon /></RoundButton>} title="Присоединяйтесь!" />
+      {busy ? (
+        <Loader />
+      ) : (
+        <form
+          className="grow"
+          style={{ display: 'flex', flexDirection: 'column' }}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            // The tap that joins also unlocks sound for the rounds that follow.
+            unlockAudio();
+            click('next');
+            setBusy(true);
+            const ok = await joinRoom(code);
+            if (!ok) setBusy(false);
+          }}
+        >
+          <label className="join-title" htmlFor="room-code">Введите код комнаты</label>
           <input
             id="room-code"
             className="input code-input"
@@ -39,14 +42,14 @@ export function Join() {
             maxLength={6}
             value={code}
             onChange={(e) => setCode(e.target.value.replace(/\D/g, ''))}
-            placeholder="123456"
+            placeholder="000000"
           />
-        </div>
-        {notice && <p className="muted" role="alert">{notice}</p>}
-        <button className="btn block" type="submit" disabled={code.length !== 6 || busy}>
-          {busy ? 'Входим…' : 'Войти в комнату'}
-        </button>
-      </form>
-    </>
+          {notice && <p className="notice" role="alert" style={{ marginTop: 16 }}>{notice}</p>}
+          <div className="grow" />
+          <ActionButton primary type="submit" disabled={code.length !== 6}>Играть</ActionButton>
+          <div style={{ height: 26 }} />
+        </form>
+      )}
+    </BlueScreen>
   );
 }

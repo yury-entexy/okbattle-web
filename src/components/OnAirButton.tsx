@@ -14,7 +14,7 @@ export function OnAirButton({ player }: { player: Player }) {
   return (
     <button
       type="button"
-      className="tag onair"
+      className="onair"
       disabled={!onAir && full}
       onClick={(e) => {
         e.stopPropagation();

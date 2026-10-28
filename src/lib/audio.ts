@@ -80,17 +80,61 @@ export function stop(fadeMs = 250): void {
   source.stop(ctx.currentTime + fadeMs / 1000);
 }
 
-const clicks = new Map<string, HTMLAudioElement>();
-/** Short UI sounds from the app (click1..8, timer). */
-export function sfx(name: string, volume = 0.5): void {
+// The app's ClickType → click sound (lib/presentation/utils/enum/click_type_enum.dart).
+const CLICKS = {
+  suggestion: 'click1',
+  next: 'click2',
+  wrongAnswer: 'click3',
+  rightAnswer: 'click4',
+  submitAnswer: 'click5',
+  startGame: 'click6',
+  results: 'click7',
+  nextQuestion: 'click8',
+} as const;
+export type Click = keyof typeof CLICKS;
+
+const sounds = new Map<string, HTMLAudioElement>();
+let clicking: HTMLAudioElement | null = null;
+let counting: HTMLAudioElement | null = null;
+
+function sound(name: string): HTMLAudioElement {
+  let el = sounds.get(name);
+  if (!el) {
+    el = new Audio(`sfx/${name}.mp3`);
+    el.preload = 'auto';
+    sounds.set(name, el);
+  }
+  return el;
+}
+
+/** Like the app's ClickPlayer: one player, a new click cuts the previous one. */
+export function click(type: Click): void {
   try {
-    let el = clicks.get(name);
-    if (!el) {
-      el = new Audio(`sfx/${name}.mp3`);
-      clicks.set(name, el);
-    }
-    el.volume = volume;
+    clicking?.pause();
+    const el = sound(CLICKS[type]);
     el.currentTime = 0;
+    clicking = el;
     void el.play().catch(() => {});
   } catch {}
+}
+
+/** The pre-round countdown sound (timer.mp3), stopped when the round starts. */
+export function countdownSound(on: boolean): void {
+  try {
+    if (!on) {
+      counting?.pause();
+      counting = null;
+      return;
+    }
+    if (counting) return;
+    const el = sound('timer');
+    el.currentTime = 0;
+    counting = el;
+    void el.play().catch(() => {});
+  } catch {}
+}
+
+/** Fetches the game sounds ahead, so the first click is not late. */
+export function preloadSounds(): void {
+  for (const name of [...Object.values(CLICKS), 'timer']) sound(name);
 }

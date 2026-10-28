@@ -58,7 +58,7 @@ export function VideoPanel() {
           {v.tiles.map((t) => <Tile key={t.uid} tile={t} name={t.local ? 'Вы' : nameOf(t.uid)} />)}
         </div>
       ) : (
-        <p className="muted video-wait">{v.error || 'Ждём видеотрансляцию ведущего…'}</p>
+        <p className="video-wait">{v.error || 'Ждём видеотрансляцию ведущего…'}</p>
       )}
       <div className="video-controls">
         {v.live && (
