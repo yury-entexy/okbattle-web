@@ -443,3 +443,76 @@ h1, h2, h3, p { margin: 0; }
 .signin-policy a { color: var(--blue); text-decoration: underline; }
 .signed-in { font-size: 14px; text-align: center; color: var(--dark); }
 .link { background: none; border: 0; padding: 0; color: var(--blue); text-decoration: underline; font: inherit; cursor: pointer; }
+
+/* «Дурак» */
+.durak-screen .blue-content { display: flex; flex-direction: column; min-height: 100%; }
+.durak-lobby { padding: 20px 16px 30px; display: grid; gap: 14px; }
+.durak-lobby .panel { color: var(--dark); }
+.await-list { display: grid; gap: 8px; }
+.await-item.fool { background: var(--incorrect); }
+.durak-table { flex: 1; display: flex; flex-direction: column; gap: 10px; padding: 4px 10px max(16px, env(safe-area-inset-bottom, 0px)); }
+.opponents { display: flex; justify-content: center; flex-wrap: wrap; gap: 6px; }
+.opp {
+  width: 84px; display: grid; justify-items: center; gap: 2px; padding: 6px 4px; border-radius: 16px;
+  background: rgba(255, 255, 255, 0.12); transition: background 0.2s ease;
+}
+.opp.turn { background: rgba(250, 205, 98, 0.35); }
+.opp.out { opacity: 0.55; }
+.opp-avatar { position: relative; width: 48px; height: 48px; display: grid; place-items: center; }
+.opp-timer { position: absolute; inset: 0; transform: rotate(-90deg); }
+.opp-timer circle { fill: none; stroke: var(--yellow); stroke-width: 3; stroke-dasharray: 138; transition: stroke-dashoffset 0.5s linear; }
+.opp-name { font-size: 12px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.opp-cards { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
+.mini-back { width: 10px; height: 14px; border-radius: 2px; background: var(--header); border: 1px solid #fff; }
+.opp-role { font-size: 10px; font-weight: 700; background: #fff; color: var(--dark-blue); border-radius: 10px; padding: 1px 6px; }
+.opp-role.def { background: var(--yellow); color: var(--dark); }
+
+.felt {
+  flex: 1; min-height: 210px; display: flex; gap: 10px; align-items: center; padding: 12px 10px; border-radius: 24px;
+  background: rgba(40, 77, 121, 0.22); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
+}
+.deck { position: relative; width: 70px; height: 96px; flex: none; }
+.deck .pcard.back { position: absolute; left: 0; top: 8px; }
+.deck-trump { position: absolute; left: 14px; top: 2px; transform: rotate(90deg); }
+.deck-count {
+  position: absolute; left: 14px; bottom: -14px; background: #fff; color: var(--dark-blue); border-radius: 10px; font-size: 12px;
+  font-weight: 700; padding: 0 6px;
+}
+.deck-suit { font-size: 46px; display: grid; place-items: center; height: 100%; color: #fff; }
+.deck-suit.red { color: #ffd2cd; }
+.table-cards { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 6px; justify-items: center; align-content: center; }
+.pair { position: relative; width: 54px; height: 78px; animation: deal 0.25s ease both; }
+.pair.target .pcard { box-shadow: 0 0 0 3px var(--yellow); cursor: pointer; }
+.pair-d { position: absolute; left: 12px; top: 14px; animation: deal 0.25s ease both; }
+.table-empty { grid-column: 1 / -1; font-size: 14px; opacity: 0.85; }
+@keyframes deal { from { transform: translateY(-14px) scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
+
+.pcard {
+  position: relative; width: 64px; height: 92px; flex: none; border-radius: 8px; background: #fff; color: #2b2b2b;
+  border: 1px solid #d5dbe3; box-shadow: 0 2px 6px rgba(26, 56, 90, 0.25); padding: 0; font: inherit; text-align: left;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, opacity 0.15s ease;
+}
+.pcard.small { width: 54px; height: 78px; }
+.pcard.red { color: #d93b30; }
+.pcard-corner { position: absolute; left: 5px; top: 3px; font-size: 15px; font-weight: 700; line-height: 1; text-align: center; }
+.pcard.small .pcard-corner { font-size: 13px; }
+.pcard-suit { position: absolute; right: 6px; bottom: 2px; font-size: 30px; line-height: 1; }
+.pcard.small .pcard-suit { font-size: 24px; }
+.pcard.back { background: var(--header); border: 3px solid #fff; display: grid; place-items: center; }
+.pcard.back img { width: 60%; opacity: 0.9; }
+button.pcard { cursor: pointer; }
+.pcard.playable { transform: translateY(-10px); box-shadow: 0 6px 12px rgba(26, 56, 90, 0.35); }
+.pcard.selected { transform: translateY(-18px); box-shadow: 0 0 0 3px var(--yellow), 0 8px 14px rgba(26, 56, 90, 0.35); }
+.pcard.dim { filter: brightness(0.85) saturate(0.7); }
+
+.durak-status { text-align: center; font-size: 16px; font-weight: 700; min-height: 22px; }
+.durak-status.mine { color: var(--yellow); }
+.durak-status small { font-weight: 400; color: #fff; }
+.hand { display: flex; justify-content: center; padding: 14px 0 4px; }
+.hand .pcard + .pcard { margin-left: calc(var(--overlap) - 64px); }
+.durak-actions { display: flex; gap: 10px; }
+.durak-actions .abtn { min-height: 52px; }
+.durak-over { padding: 20px 16px 30px; display: grid; gap: 12px; justify-items: center; text-align: center; }
+.durak-over h2 { font-size: 26px; }
+.durak-over .await-list, .durak-over .abtn { width: 100%; }
+.type-icon.durak { background: rgba(250, 107, 98, 0.12); }

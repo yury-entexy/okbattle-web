@@ -49,6 +49,13 @@ saved on their `Users` doc as `utm`. Counters load only when their ids are set o
 Goals sent to all of them: `game_join`, `game_start`, `game_finish`, `sign_up` (Facebook gets
 `GameJoin`, `GameStart`, `GameFinish` and the standard `CompleteRegistration`).
 
+## «Дурак»
+
+Create game → «Дурак»: обычный, подкидной or переводной, 36 cards, 2–5 players, people and bots
+mixed. Friends join with the room code like any other game. The rules are pure functions in
+`src/lib/durak/rules.ts` (with the bots in `bot.ts`); the room format, written so the mobile app can
+join the same tables later, is in [docs/durak-protocol.md](docs/durak-protocol.md).
+
 ## Sign-in
 
 Google and Apple sign-in work as in the app: the player's `Users/{uid}` doc is keyed by the Firebase

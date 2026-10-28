@@ -24,7 +24,7 @@ import {
   type Room,
 } from './engine';
 
-export type Screen = 'home' | 'setup' | 'join' | 'eternal' | 'room';
+export type Screen = 'home' | 'setup' | 'join' | 'eternal' | 'room' | 'durak';
 
 interface Me {
   id: string;

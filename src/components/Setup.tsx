@@ -6,6 +6,7 @@ import { dataSource } from '@/lib/data/source';
 import { textLocale } from '@/lib/game/engine';
 import { ActionButton, AppBar, BackIcon, BlueScreen, RoundButton } from './ui';
 import { useGame } from '@/lib/game/store';
+import { DurakSetup } from './DurakSetup';
 import { PUNISHMENT_KINDS } from '@/lib/punishments';
 import type { Category, GameSettings, GameType } from '@/lib/types';
 
@@ -83,7 +84,7 @@ const DEFAULTS: Omit<GameSettings, 'type' | 'categories' | 'roundSeconds'> = {
 
 export function Setup() {
   const { goHome, createRoom } = useGame();
-  const [type, setType] = useState<GameType>('music');
+  const [type, setType] = useState<GameType | 'durak'>('music');
   const [cats, setCats] = useState<Partial<Record<GameType, Category[]>>>({});
   const [error, setError] = useState('');
   const [open, setOpen] = useState('');
@@ -96,7 +97,7 @@ export function Setup() {
   const lang = textLocale(s.locale);
 
   useEffect(() => {
-    if (cats[type]) return;
+    if (type === 'durak' || cats[type]) return;
     let live = true;
     dataSource()
       .then((src) => src.categories(type))
@@ -107,13 +108,13 @@ export function Setup() {
     };
   }, [type, cats]);
 
-  const list = cats[type];
+  const list = type === 'durak' ? undefined : cats[type];
   const categories = Object.entries(chosen)
     .filter(([, subs]) => subs.length)
     .map(([id, subcategories]) => ({ id, subcategories }));
   const subCount = categories.reduce((n, c) => n + c.subcategories.length, 0);
 
-  function chooseType(t: GameType) {
+  function chooseType(t: GameType | 'durak') {
     setType(t);
     setOpen('');
     setChosen({});
@@ -131,6 +132,7 @@ export function Setup() {
   }
 
   async function create() {
+    if (type === 'durak') return;
     setBusy(true);
     setError('');
     try {
@@ -165,6 +167,12 @@ export function Setup() {
         <img className="type-icon quiz" src="ui/quiz_game_type.svg" alt="" />
         Интеллектуальная викторина
       </button>
+      <button className="type-btn" aria-pressed={type === 'durak'} onClick={() => chooseType('durak')}>
+        <img className="type-icon durak" src="ui/durak_game_type.svg" alt="" />
+        Дурак
+      </button>
+
+      {type === 'durak' ? <DurakSetup /> : <>
 
       <p className="section-title">Категория {subCount > 0 && `· выбрано подкатегорий: ${subCount}`}</p>
       {!list && !error && <div className="spinner" aria-label="Загрузка" />}
@@ -312,6 +320,7 @@ export function Setup() {
           {busy ? 'Готовим вопросы…' : subCount ? 'Создать игру' : 'Выберите категорию'}
         </ActionButton>
       </div>
+      </>}
     </BlueScreen>
   );
 }
