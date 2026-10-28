@@ -1,6 +1,9 @@
 import {
   collection,
+  doc,
+  getDoc,
   getDocs,
+  connectFirestoreEmulator,
   getFirestore,
   limit,
   query,
@@ -9,9 +12,14 @@ import {
 } from 'firebase/firestore/lite';
 import type { Category, GameType, Locale, Localized, Question } from '@/lib/types';
 import { firebaseApp } from '@/lib/firebase-app';
-import { pickRandom, type DataSource } from './source';
+import { pickByLevel, type DataSource } from './source';
 
-const db = getFirestore(firebaseApp());
+export const db = getFirestore(firebaseApp());
+const emulator = process.env.NEXT_PUBLIC_FIRESTORE_EMULATOR;
+if (emulator) {
+  const [host, port] = emulator.split(':');
+  connectFirestoreEmulator(db, host, Number(port));
+}
 
 const CATEGORIES: Record<GameType, string> = { music: 'Categories', quiz: 'CommonQuestionCategories' };
 const QUESTIONS: Record<GameType, string> = { music: 'Sounds', quiz: 'CommonQuestions' };
@@ -48,12 +56,13 @@ function toQuestion(type: GameType, id: string, d: DocumentData): Question | nul
   if (!ru?.question) return null;
   const en = card.en ?? ru;
   const content = d.content;
-  if (content?.type && content.type !== 'image' && content.type !== 'text') return null;
+
   return {
     kind: 'quiz',
     id,
     level: d.level ?? 1,
     image: content?.type === 'image' ? content.data?.[0]?.url : undefined,
+    video: content?.type === 'video' ? content.data?.[0]?.url : undefined,
     question: { ru: ru.question, en: en.question },
     options: { ru: options(ru), en: options(en) } as Record<Locale, string[]>,
   };
@@ -78,13 +87,22 @@ export const firebaseSource: DataSource = {
     );
   },
 
-  async questions(type, subcategoryId, count) {
-    const snap = await getDocs(
-      query(collection(db, QUESTIONS[type]), where('subCatID', '==', subcategoryId), limit(POOL)),
+  async questions(type, subcategoryIds, count, levels) {
+    const pools = await Promise.all(
+      subcategoryIds.map(async (id) => {
+        const snap = await getDocs(query(collection(db, QUESTIONS[type]), where('subCatID', '==', id), limit(POOL)));
+        return snap.docs.map((d) => toQuestion(type, d.id, d.data())).filter((q): q is Question => q !== null);
+      }),
     );
-    const all = snap.docs
-      .map((d) => toQuestion(type, d.id, d.data()))
-      .filter((q): q is Question => q !== null);
-    return pickRandom(all, count);
+    return pickByLevel(pools.flat(), count, levels);
+  },
+
+  async byIds(type, ids) {
+    return Promise.all(
+      ids.map(async (id) => {
+        const snap = await getDoc(doc(db, QUESTIONS[type], id));
+        return snap.exists() ? toQuestion(type, id, snap.data()) : null;
+      }),
+    );
   },
 };

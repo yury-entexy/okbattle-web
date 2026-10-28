@@ -1,19 +1,37 @@
 'use client';
 
 import { create } from 'zustand';
-import { roomTransport } from '@/lib/room';
-import { roundKey, type Room, type RoomTransport } from '@/lib/room/types';
-import type { GameSettings, Locale, Question } from '@/lib/types';
-import { buildRounds, gameCode, makeBots, planBotAnswer, type Answer, type Player } from './engine';
+import { dataSource } from '@/lib/data/source';
+import { backend } from '@/lib/net';
+import type { Backend, GameDoc, LiveAnswer, LiveGame, LiveMember } from '@/lib/net/types';
+import type { GameSettings, Question } from '@/lib/types';
+import {
+  gameCode,
+  gameDoc,
+  makeBots,
+  nextEvent,
+  placeholder,
+  planBotAnswer,
+  sameAnswer,
+  standings,
+  view,
+  type Answer,
+  type Room,
+} from './engine';
 
 export type Screen = 'home' | 'setup' | 'join' | 'room';
 
+interface Me {
+  id: string;
+  name: string;
+  avatar: string;
+}
+
 interface GameState {
   screen: Screen;
-  locale: Locale;
-  me: Player;
+  me: Me;
   room: Room | null;
-  /** Set when the room disappeared under a guest (host left) or a join failed. */
+  /** Set when the game ended under a guest (host left) or a join failed. */
   notice: string;
 
   setName(name: string): void;
@@ -24,94 +42,170 @@ interface GameState {
   createRoom(settings: GameSettings, questions: Question[]): Promise<void>;
   joinRoom(code: string): Promise<boolean>;
   start(): void;
-  answer(option: number): void;
-  /** Host only: advances stages; called every frame. */
+  /** A tapped option index, or typed text in `enter` rounds. */
+  answer(choice: number | string): void;
+  /** Host only, typed-answer rounds with manual judging: the round winner, or null for none. */
+  pickWinner(playerId: string | null): void;
+  /** Host only: skip the rest of the answers or results screen. */
+  next(): void;
+  /** Host only: advances the game; called every frame. */
   drive(): void;
   now(): number;
 }
 
-export const COUNTDOWN_MS = 3000;
-export const REVEAL_MS = 4500;
+/** How long the host's device shows the answers and the standings before moving on. */
+export const ANSWERS_MS = 6000;
+export const RESULTS_MS = 5000;
+// Grace after the timer so late answers from slow phones still land, as the app's host waits 1 s.
+const ROUND_GRACE_MS = 1000;
 
-let transport: RoomTransport | null = null;
-let unsubscribe: (() => void) | null = null;
-// The last stage transition this host issued, so a frame loop does not send it twice.
+let be: Backend | null = null;
+let unwatch: (() => void) | null = null;
+let current: { id: string; doc: GameDoc; live: LiveGame; questions: Array<Question | null>; eventKey: string; eventAt: number } | null = null;
+// Host-only memory: which transitions were already sent, and each bot's plan for the game.
 let issued = '';
+let bots = new Map<string, number>();
+const planned = new Map<string, Answer>();
+const botWrites = new Set<string>();
 
+function storage(kind: 'local' | 'session') {
+  try {
+    return kind === 'local' ? localStorage : sessionStorage;
+  } catch {
+    return null;
+  }
+}
+
+/** One id per browser: it names this player's `Users` doc, which the app reads. */
 function playerId(): string {
-  // Per tab, so two tabs in one browser are two players.
-  try {
-    let id = sessionStorage.getItem('sg.uid');
-    if (!id) {
-      id = crypto.randomUUID().replace(/-/g, '').slice(0, 20);
-      sessionStorage.setItem('sg.uid', id);
-    }
-    return id;
-  } catch {
-    return Math.random().toString(36).slice(2, 14);
+  const store = storage('local');
+  let id = store?.getItem('sg.uid');
+  if (!id || !id.startsWith('web')) {
+    id = `web${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
+    store?.setItem('sg.uid', id);
   }
+  return id;
 }
 
-function savedName(): string {
-  try {
-    return localStorage.getItem('sg.name') || 'Игрок';
-  } catch {
-    return 'Игрок';
-  }
+const savedName = () => storage('local')?.getItem('sg.name') || 'Игрок';
+
+/** Absolute, so phones can load web avatars too. */
+export function avatarUrl(avatar: string): string {
+  if (!avatar || /^https?:/.test(avatar)) return avatar;
+  return new URL(`avatars/${avatar}.webp`, location.href).href;
 }
 
-export const isHost = (s: Pick<GameState, 'room' | 'me'>) => s.room?.hostId === s.me.id;
+export const isHost = (s: Pick<GameState, 'room' | 'me'>) => !!s.room && s.room.hostId === s.me.id;
 
-/** Answers of one round that are already visible: bot answers appear only once their time comes. */
-export function visibleAnswers(room: Room, now: number): Record<string, Answer> {
-  const all = room.answers?.[roundKey(room.index)] ?? {};
-  if (room.stage !== 'question') return all;
-  const elapsed = now - room.stageAt;
-  return Object.fromEntries(Object.entries(all).filter(([, a]) => a.ms <= elapsed));
+function member(name: string, imageUrl: string, answers: LiveAnswer[], now: number): LiveMember {
+  return { name, imageUrl, answers, winsAmount: 0, connectedSince: now, lastInGamePosition: -2, userChangedAnswer: false };
 }
 
-export function answersByRound(room: Room): Array<Record<string, Answer>> {
-  return room.rounds.map((_, i) => room.answers?.[roundKey(i)] ?? {});
+function liveAnswer(a: Answer): LiveAnswer {
+  return { value: a.text, time: Math.round(a.ms * 1000), isCorrect: a.correct, numberInOrder: a.option ?? -1 };
+}
+
+/** Places for the app's final screen: by position with the time tiebreak, otherwise shared places by score. */
+function places(room: Room): Record<string, number> {
+  const table = standings(Object.values(room.players), room.answers, room.doc.takeIntoAnswerTime);
+  const out: Record<string, number> = {};
+  let place = 0;
+  table.forEach((s, i) => {
+    place = room.doc.takeIntoAnswerTime || i === 0 || s.correct < table[i - 1].correct ? i + 1 : place;
+    out[s.player.id] = room.doc.takeIntoAnswerTime ? i + 1 : place;
+  });
+  return out;
+}
+
+/** The app's rule: the last one loses with up to 5 players, the last two up to 10, else the last three. */
+export function losers(room: Room) {
+  const table = standings(Object.values(room.players), room.answers, room.doc.takeIntoAnswerTime);
+  const n = table.length;
+  const count = n <= 1 ? 0 : n <= 5 ? 1 : n <= 10 ? 2 : 3;
+  return table.slice(n - count).map((s) => s.player);
 }
 
 export const useGame = create<GameState>((set, get) => {
-  async function attach(code: string) {
-    transport ??= await roomTransport();
-    unsubscribe?.();
-    unsubscribe = transport.subscribe(code, (room) => {
-      if (!room) {
-        const wasGuest = get().room && !isHost(get());
-        unsubscribe?.();
-        unsubscribe = null;
-        set({ room: null, screen: 'home', notice: wasGuest ? 'Ведущий закрыл комнату.' : '' });
+  function render() {
+    if (!current) return;
+    const { id, doc, live, questions, eventAt } = current;
+    set({ room: view(id, doc, live, questions, eventAt), screen: 'room' });
+  }
+
+  function leave(notice = '') {
+    unwatch?.();
+    unwatch = null;
+    current = null;
+    set({ room: null, screen: 'home', notice });
+  }
+
+  async function attach(id: string, doc: GameDoc) {
+    be ??= await backend();
+    if (doc.gameType !== 'music' && doc.gameType !== 'quiz') throw new Error('unsupported');
+    const questions = await (await dataSource()).byIds(doc.gameType, doc.questions);
+    unwatch?.();
+    current = { id, doc, live: { currentEvent: 'waiting', currentRound: 0 }, questions, eventKey: '', eventAt: be.now() };
+    unwatch = be.watch(id, (live) => {
+      if (!current) return;
+      if (!live || live.currentEvent === 'master_left') {
+        leave(isHost(get()) ? '' : 'Ведущий завершил игру.');
         return;
       }
-      set({ room, screen: 'room' });
+      const key = `${live.currentEvent}#${live.currentRound}`;
+      if (key !== current.eventKey) {
+        current.eventKey = key;
+        current.eventAt = be!.now();
+      }
+      current.live = live;
+      render();
     });
   }
 
-  function detach() {
-    const { room, me } = get();
-    unsubscribe?.();
-    unsubscribe = null;
-    if (room && transport) void transport.remove(room.code, isHost(get()) ? undefined : `players/${me.id}`);
-    set({ room: null });
+  /** Host: placeholders for the round, so every member's answers stay a dense list the app can read. */
+  function roundPatch(room: Room, index: number): Record<string, unknown> {
+    const patch: Record<string, unknown> = {};
+    for (const pid of Object.keys(room.players)) patch[`members/${pid}/answers/${index}`] = placeholder(room.doc.roundTime);
+    const event = nextEvent(room.doc);
+    return { ...patch, currentRound: index, roundStartTime: be!.now(), currentEvent: event, lastRoundEvent: event };
+  }
+
+  function finishRound(room: Room, winner: string | null) {
+    const last = room.index + 1 >= room.total;
+    const patch: Record<string, unknown> = {
+      [`selectedUser/${room.index}`]: winner ?? '',
+      currentEvent: last ? 'final_results' : 'results',
+    };
+    if (winner) {
+      patch[`members/${winner}/answers/${room.index}/isCorrect`] = true;
+      const answers = room.answers.slice();
+      answers[room.index] = { ...answers[room.index], [winner]: { ...answers[room.index][winner], correct: true } };
+      room = { ...room, answers };
+    }
+    if (last) {
+      patch.finalResultsUsersOrder = places(room);
+      if (room.doc.punishmentType !== 'nonePunishment') patch.finalResultsPunishedUsers = losers(room).map((p) => p.name);
+    }
+    void be!.update(room.id, patch);
+  }
+
+  function nextRound(room: Room) {
+    const patch = roundPatch(room, room.index + 1);
+    for (const [pid, place] of Object.entries(places(room))) patch[`members/${pid}/lastInGamePosition`] = place;
+    void be!.update(room.id, patch);
   }
 
   return {
     screen: 'home',
-    locale: 'ru',
     me: { id: '', name: 'Игрок', avatar: 'wolf' },
     room: null,
     notice: '',
 
     setName(name) {
-      try {
-        localStorage.setItem('sg.name', name);
-      } catch {}
+      storage('local')?.setItem('sg.name', name);
       set((s) => ({ me: { ...s.me, name, id: s.me.id || playerId() } }));
     },
     setAvatar(avatar) {
+      storage('local')?.setItem('sg.avatar', avatar);
       set((s) => ({ me: { ...s.me, avatar } }));
     },
     goSetup() {
@@ -121,110 +215,181 @@ export const useGame = create<GameState>((set, get) => {
       set((s) => ({ screen: 'join', notice: '', me: { ...s.me, id: s.me.id || playerId() } }));
     },
     goHome() {
-      detach();
+      const { room, me } = get();
+      if (room && be) {
+        if (isHost(get())) {
+          // As the app's host does: announce the end, then delete the game.
+          const { id } = room;
+          void be.update(id, { currentEvent: 'master_left' }).then(() => {
+            void be!.deleteGame(id);
+            setTimeout(() => void be!.remove(id), 3000);
+          });
+        } else {
+          void be.remove(room.id, `members/${me.id}`);
+          be.cancelOnDisconnect(room.id, `members/${me.id}`);
+        }
+      }
+      leave();
       set({ screen: 'home' });
     },
 
     async createRoom(settings, questions) {
-      transport ??= await roomTransport();
-      const { me, locale } = get();
+      be ??= await backend();
+      const { me } = get();
       let code = gameCode();
-      for (let i = 0; i < 5 && (await transport.exists(code)); i++) code = gameCode();
-      const now = transport.serverNow();
-      const players: Room['players'] = { [me.id]: { ...me, joinedAt: now } };
-      makeBots(settings.bots).forEach((b, i) => (players[b.id] = { ...b, joinedAt: now + i }));
-      const room: Room = {
-        code,
-        hostId: me.id,
-        settings,
-        rounds: buildRounds(questions, settings, locale),
-        players,
-        stage: 'lobby',
-        index: 0,
-        stageAt: now,
-      };
+      for (let i = 0; i < 5 && (await be.findGame(code)); i++) code = gameCode();
+      const now = be.now();
+      const crew = settings.isPrivate ? [] : makeBots(settings.bots);
+      await Promise.all([
+        be.saveUser(me.id, { name: me.name, avatarUrl: avatarUrl(me.avatar) }),
+        ...crew.map((b) => be!.saveUser(b.id, { name: b.name, avatarUrl: avatarUrl(b.avatar), isBot: true })),
+      ]);
+      const doc = gameDoc(settings, me.id, code, questions.map((q) => q.id));
+      const id = await be.createGame(doc);
+      const members: Record<string, LiveMember> = {};
+      if (settings.isAdminPlayer) members[me.id] = member(me.name, avatarUrl(me.avatar), [], now);
+      crew.forEach((b, i) => (members[b.id] = member(b.name, avatarUrl(b.avatar), [], now + i + 1)));
+      bots = new Map(crew.map((b) => [b.id, b.accuracy]));
+      botWrites.clear();
+      planned.clear();
       issued = '';
-      await transport.create(room);
-      transport.leaveOnDisconnect(code, me.id, true);
-      await attach(code);
+      await be.update(id, {
+        currentEvent: 'waiting',
+        currentRound: 0,
+        isBackgroundMusicPlaying: false,
+        backgroundMusicVolume: 5,
+        currentMusicVolume: 5,
+        adminInteractions: 'none',
+        members,
+      });
+      // If this tab goes away, players see the game end instead of waiting forever.
+      be.onDisconnect(id, 'currentEvent', 'master_left');
+      await attach(id, doc);
     },
 
     async joinRoom(code) {
-      transport ??= await roomTransport();
+      be ??= await backend();
       const { me } = get();
-      if (!(await transport.exists(code))) {
-        set({ notice: 'Комната с таким кодом не найдена. Проверьте код у ведущего.' });
+      try {
+        const found = await be.findGame(code);
+        const live = found && (await be.read(found.id));
+        if (!found || !live) {
+          set({ notice: 'Комната с таким кодом не найдена. Проверьте код у ведущего.' });
+          return false;
+        }
+        if (live.bannedUsers?.includes(me.id)) {
+          set({ notice: 'Ведущий не пускает вас в эту комнату.' });
+          return false;
+        }
+        await be.saveUser(me.id, { name: me.name, avatarUrl: avatarUrl(me.avatar) });
+        const started = live.currentEvent !== 'waiting' && live.currentEvent !== 'repeat_game_waiting';
+        const existing = live.members?.[me.id]?.answers ?? [];
+        // Rounds already played count as missed, like a late joiner in the app.
+        const answers = Array.isArray(existing) ? existing.slice() : [];
+        for (let i = answers.length; i < (live.currentRound ?? 0) + (started ? 1 : 0); i++) answers.push(placeholder(found.doc.roundTime));
+        await be.update(found.id, { [`members/${me.id}`]: member(me.name, avatarUrl(me.avatar), answers, be.now()) });
+        be.onDisconnect(found.id, `members/${me.id}`, null);
+        // Drop the code from the address so leaving the room does not re-open the join screen.
+        try {
+          history.replaceState(null, '', location.pathname + location.search);
+        } catch {}
+        await attach(found.id, found.doc);
+        return true;
+      } catch {
+        set({ notice: 'Не получилось войти. Если это игра про кино, на вебе её пока нет; иначе попробуйте ещё раз.' });
         return false;
       }
-      await transport.update(code, { [`players/${me.id}`]: { ...me, joinedAt: transport.serverNow() } });
-      transport.leaveOnDisconnect(code, me.id, false);
-      // Drop the code from the address so leaving the room does not re-open the join screen.
-      try {
-        history.replaceState(null, '', location.pathname + location.search);
-      } catch {}
-      await attach(code);
-      return true;
     },
 
     start() {
       const { room } = get();
-      if (!room || !transport || !isHost(get())) return;
+      if (!room || !be || !isHost(get()) || room.stage !== 'lobby') return;
       issued = '';
-      void transport.update(room.code, { stage: 'countdown', index: 0, stageAt: transport.serverNow(), answers: null });
+      botWrites.clear();
+      void be.update(room.id, roundPatch(room, 0));
     },
 
-    answer(option) {
+    answer(choice) {
       const { room, me } = get();
-      if (!room || !transport || room.stage !== 'question') return;
-      const key = roundKey(room.index);
-      if (room.answers?.[key]?.[me.id]) return;
-      const ms = Math.max(0, Math.round(transport.serverNow() - room.stageAt));
-      const correct = room.rounds[room.index].options[option]?.correct ?? false;
-      void transport.update(room.code, { [`answers/${key}/${me.id}`]: { option, ms, correct } });
+      if (!room?.round || !be || room.stage !== 'question' || !room.players[me.id]) return;
+      if (room.answers[room.index][me.id]) return;
+      const elapsed = be.now() - room.startsAt;
+      if (elapsed < 0) return;
+      const ms = Math.min(room.roundMs, Math.round(elapsed));
+      const round = room.round;
+      const a: Answer =
+        typeof choice === 'number'
+          ? { option: choice, text: round.options[choice]?.text ?? '', ms, correct: round.options[choice]?.correct ?? false }
+          : { option: null, text: choice.trim(), ms, correct: sameAnswer(choice, round.answer) };
+      if (!a.text) return;
+      void be.update(room.id, { [`members/${me.id}/answers/${room.index}`]: liveAnswer(a) });
+    },
+
+    pickWinner(playerId) {
+      const { room } = get();
+      if (!room || !be || !isHost(get()) || room.stage !== 'answers') return;
+      if (issued === `w${room.index}`) return;
+      issued = `w${room.index}`;
+      finishRound(room, playerId);
+    },
+
+    next() {
+      const { room } = get();
+      if (!room || !be || !isHost(get())) return;
+      if (room.stage === 'answers') get().pickWinner(null);
+      else if (room.stage === 'results' && issued !== `n${room.index}`) {
+        issued = `n${room.index}`;
+        nextRound(room);
+      }
     },
 
     now() {
-      return transport ? transport.serverNow() : Date.now();
+      return be ? be.now() : Date.now();
     },
 
     // Everything is derived from timestamps, so a throttled background tab catches up instead of drifting.
     drive() {
       const { room } = get();
-      if (!room || !transport || !isHost(get())) return;
-      const now = transport.serverNow();
-      const elapsed = now - room.stageAt;
-      const roundMs = room.settings.roundSeconds * 1000;
-      const go = (tag: string, patch: Record<string, unknown>) => {
+      if (!room || !be || !isHost(get())) return;
+      const now = be.now();
+      const go = (tag: string, run: () => void) => {
         if (issued === tag) return;
         issued = tag;
-        void transport!.update(room.code, patch);
+        run();
       };
 
-      if (room.stage === 'countdown' && elapsed >= COUNTDOWN_MS) {
-        const patch: Record<string, unknown> = { stage: 'question', stageAt: now };
-        const all = answersByRound(room);
-        for (const p of Object.values(room.players)) {
-          if (!p.bot) continue;
-          const history = all.slice(0, room.index).map((r) => r[p.id]).filter(Boolean);
-          patch[`answers/${roundKey(room.index)}/${p.id}`] = planBotAnswer(
-            p,
-            room.rounds[room.index],
-            history,
-            room.rounds.length,
-            roundMs,
-          );
+      if (room.stage === 'question' && room.round) {
+        const elapsed = now - room.startsAt;
+        const answered = room.answers[room.index];
+        const patch: Record<string, unknown> = {};
+        for (const [botId, accuracy] of bots) {
+          if (!room.players[botId] || answered[botId]) continue;
+          const key = `${room.index}/${botId}`;
+          if (botWrites.has(key)) continue;
+          // Plan once per round; write when its moment comes.
+          if (!planned.has(key)) {
+            const history = room.answers.slice(0, room.index).map((r) => r[botId]).filter(Boolean);
+            planned.set(key, planBotAnswer(accuracy, room.round, history, room.total, room.roundMs));
+          }
+          const p = planned.get(key)!;
+          if (elapsed >= p.ms) {
+            botWrites.add(key);
+            patch[`members/${botId}/answers/${room.index}`] = liveAnswer(p);
+          }
         }
-        go(`q${room.index}`, patch);
-      } else if (room.stage === 'question') {
-        const shown = visibleAnswers(room, now);
-        const everyone = Object.keys(room.players).every((id) => shown[id]);
-        if (everyone || elapsed >= roundMs) go(`r${room.index}`, { stage: 'reveal', stageAt: now });
-      } else if (room.stage === 'reveal' && elapsed >= REVEAL_MS) {
-        const last = room.index + 1 >= room.rounds.length;
-        go(
-          last ? 'final' : `c${room.index + 1}`,
-          last ? { stage: 'final', stageAt: now } : { stage: 'countdown', index: room.index + 1, stageAt: now },
-        );
+        if (Object.keys(patch).length) void be.update(room.id, patch);
+        const everyone = Object.keys(room.players).every((pid) => answered[pid] || patch[`members/${pid}/answers/${room.index}`]);
+        if (elapsed > 0 && (everyone || elapsed >= room.roundMs + ROUND_GRACE_MS)) {
+          go(`e${room.index}`, () => {
+            if (room.doc.takeIntoAnswerTime) void be!.update(room.id, { currentEvent: 'answers' });
+            else finishRound(room, null);
+          });
+        }
+      } else if (room.stage === 'answers') {
+        const manual = room.round?.mode === 'enter' && room.doc.winnerDeterminationType === 'manually';
+        if (!manual && now - room.stageAt >= ANSWERS_MS) get().pickWinner(null);
+      } else if (room.stage === 'results' && now - room.stageAt >= RESULTS_MS) {
+        get().next();
       }
     },
   };

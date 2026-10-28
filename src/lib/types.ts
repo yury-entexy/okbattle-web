@@ -21,6 +21,7 @@ export interface QuizQuestion {
   id: string;
   level: number;
   image?: string;
+  video?: string;
   question: Localized;
   options: Record<Locale, string[]>;
 }
@@ -40,14 +41,36 @@ export interface Category {
   subcategories: Subcategory[];
 }
 
-export type MusicAsk = 'author' | 'title' | 'mixed';
+export type AnswerMode = 'choose' | 'enter' | 'mixed';
+/** What music rounds ask about; the names are the mobile app's `questionsType` values. */
+export type QuestionsType = 'songAuthorOnly' | 'songTitleOnly' | 'mixed';
+export type WinnerDetermination = 'automatically' | 'manually';
+export type BackgroundMusic = 'fast' | 'medium' | 'slow';
+export type Punishment = 'nonePunishment' | 'verbalPunishment' | 'physicalPunishment' | 'socialPunishment';
 
+/** Game settings, mirroring the mobile app's create-game screen (stored in the `OKGames` doc). */
 export interface GameSettings {
   type: GameType;
-  categoryId: string;
-  subcategoryId: string;
+  categories: Array<{ id: string; subcategories: string[] }>;
   rounds: number;
+  /** Question levels 1–3. */
+  difficulty: number[];
   roundSeconds: number;
-  ask: MusicAsk;
+  answerType: AnswerMode;
+  questionsType: QuestionsType;
+  /** Only used with typed answers: whether the host picks the round winner by hand. */
+  winnerDetermination: WinnerDetermination;
+  /** Ties on correct answers go to the faster player, and an answers screen follows each round. */
+  takeIntoAnswerTime: boolean;
+  /** Music only: off means the snippet plays on the host's device alone, as at a party. */
+  everyoneHasSound: boolean;
+  isAdminPlayer: boolean;
+  backgroundMusic: BackgroundMusic;
+  punishment: Punishment;
+  /** Game language key as in the mobile app: ru, AmE, BrE, es, de… */
+  locale: string;
+  antiShazam: boolean;
+  /** Private games get no bots. */
+  isPrivate: boolean;
   bots: number;
 }

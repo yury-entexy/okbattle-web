@@ -1,5 +1,5 @@
 import type { Category, GameType, Localized, Question } from '@/lib/types';
-import { pickRandom, type DataSource } from './source';
+import { pickByLevel, type DataSource } from './source';
 
 // Shape of public/data/catalog.json, produced by the snapshot export script.
 interface SnapshotSub {
@@ -41,14 +41,21 @@ export const snapshotSource: DataSource = {
     }));
   },
 
-  async questions(type, subcategoryId, count) {
-    const data = await load();
-    const sub = data[type].flatMap((c) => c.subcategories).find((s) => s.id === subcategoryId);
-    if (!sub) return [];
-    return pickRandom(sub.questions, count).map((q) =>
-      type === 'music'
-        ? ({ ...q, kind: 'music', audio: media(q.audio)!, photo: media(q.photo) } as Question)
-        : ({ ...q, kind: 'quiz', image: media(q.image) } as Question),
+  async questions(type, subcategoryIds, count, levels) {
+    const subs = (await load())[type].flatMap((c) => c.subcategories).filter((s) => subcategoryIds.includes(s.id));
+    return pickByLevel(subs.flatMap((s) => s.questions.map((q) => toQuestion(type, q))), count, levels);
+  },
+
+  async byIds(type, ids) {
+    const all = new Map(
+      (await load())[type].flatMap((c) => c.subcategories.flatMap((s) => s.questions)).map((q) => [q.id as string, q]),
     );
+    return ids.map((id) => (all.has(id) ? toQuestion(type, all.get(id)!) : null));
   },
 };
+
+function toQuestion(type: GameType, q: Record<string, unknown>): Question {
+  return type === 'music'
+    ? ({ ...q, kind: 'music', audio: media(q.audio)!, photo: media(q.photo) } as Question)
+    : ({ ...q, kind: 'quiz', image: media(q.image) } as Question);
+}

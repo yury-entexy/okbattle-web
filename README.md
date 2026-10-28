@@ -9,7 +9,9 @@ Web port of the Flutter app. It reads the mobile app's Firebase project, so cate
 - A room with a code, 1–5 bot opponents (same accuracy rules as the mobile bots), 5 or 10 rounds of 15 or 30 seconds.
 - Scoring as in the app: the most correct answers wins, ties go to the faster total answer time.
 
-Not yet: joining a room from another device (Realtime Database), sign-in, video broadcast (Agora), scheduled games, subscription and ads.
+Rooms use the mobile app's own format (Firestore `OKGames` + Realtime Database `Games/{id}`), so web and mobile players join each other's games by the same 6-digit code. Each web player gets a guest `Users` doc. Not yet: movie games, sign-in, video broadcast (Agora), chat, voting, reactions, kicking players, scheduled games, background music, subscription and ads.
+
+Local testing against emulators: set `NEXT_PUBLIC_FIRESTORE_EMULATOR=127.0.0.1:8085` and `NEXT_PUBLIC_RTDB_EMULATOR=127.0.0.1:9000`.
 
 ## Run
 

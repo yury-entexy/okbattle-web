@@ -17,7 +17,7 @@ export function App() {
       {screen === 'setup' && <Setup />}
       {screen === 'join' && <Join />}
       {screen === 'room' && stage === 'lobby' && <Lobby />}
-      {screen === 'room' && (stage === 'countdown' || stage === 'question' || stage === 'reveal') && <Play />}
+      {screen === 'room' && (stage === 'question' || stage === 'answers' || stage === 'results') && <Play />}
       {screen === 'room' && stage === 'final' && <Final />}
     </main>
   );

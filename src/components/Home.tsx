@@ -13,17 +13,19 @@ export function Home() {
     try {
       const saved = localStorage.getItem('sg.name');
       if (saved) setLocalName(saved);
+      const face = localStorage.getItem('sg.avatar');
+      if (face && AVATARS.includes(face)) setAvatar(face);
     } catch {}
     // A shared link carries the room code in the hash: go straight to joining.
     if (/^#\d{6}$/.test(location.hash)) goJoin();
-  }, [goJoin]);
+  }, [goJoin, setAvatar]);
 
   return (
     <>
       <section className="hero">
         <img className="logo" src="icon.png" width={72} height={72} alt="" />
         <h1>OK Battle</h1>
-        <p>Угадай песню по первым секундам или ответь на вопрос быстрее соперников. 30 секунд на раунд.</p>
+        <p>Угадай песню по первым секундам или ответь на вопрос быстрее соперников. Играйте с друзьями с веба и из мобильного приложения в одной комнате.</p>
       </section>
 
       <form

@@ -3,7 +3,8 @@
 import { useEffect } from 'react';
 import { stop } from '@/lib/audio';
 import { standings } from '@/lib/game/engine';
-import { answersByRound, isHost, useGame } from '@/lib/game/store';
+import { isHost, losers, useGame } from '@/lib/game/store';
+import { punishmentText } from '@/lib/punishments';
 import { Avatar } from './Avatar';
 
 export function Final() {
@@ -14,7 +15,10 @@ export function Final() {
   if (!room) return null;
 
   const players = Object.values(room.players);
-  const table = standings(players, answersByRound(room));
+  const byTime = room.doc.takeIntoAnswerTime;
+  const table = standings(players, room.answers, byTime);
+  const punishment = punishmentText(room.doc.punishmentType);
+  const punished = punishment ? losers(room) : [];
   const top = table.slice(0, 3);
   const myPlace = table.findIndex((s) => s.player.id === me.id) + 1;
   // Podium order: 2nd, 1st, 3rd.
@@ -43,7 +47,7 @@ export function Final() {
       </section>
 
       <section className="card">
-        <p className="label">Итоги · {room.rounds.length} раундов</p>
+        <p className="label">Итоги · {room.total} раундов</p>
         <div className="table">
           {table.map((s, i) => (
             <div key={s.player.id} className={`line ${s.player.id === me.id ? 'me' : ''}`}>
@@ -53,12 +57,19 @@ export function Final() {
               <span className="score">
                 <img src="icons/coin.svg" width={18} height={18} alt="" />
                 {s.correct}
-                <small>· {(s.correctMs / 1000).toFixed(1)} с</small>
+                {byTime && <small>· {(s.correctMs / 1000).toFixed(1)} с</small>}
               </span>
             </div>
           ))}
         </div>
       </section>
+
+      {punished.length > 0 && (
+        <section className="card">
+          <p className="label">Наказание для {punished.length > 1 ? 'игроков' : 'игрока'} {punished.map((p) => p.name).join(', ')}</p>
+          <p className="prompt" style={{ margin: 0 }}>{punishment}</p>
+        </section>
+      )}
 
       <div className="row">
         {host && (
