@@ -15,7 +15,7 @@ const ASKS: Array<[MusicAsk, string]> = [
 ];
 
 export function Setup() {
-  const { goHome, openLobby, locale } = useGame();
+  const { goHome, createRoom, locale } = useGame();
   const [type, setType] = useState<GameType>('music');
   const [cats, setCats] = useState<Partial<Record<GameType, Category[]>>>({});
   const [error, setError] = useState('');
@@ -61,7 +61,7 @@ export function Setup() {
       if (!questions.length) throw new Error('empty');
       // Start downloading the first snippet while the lobby fills up.
       if (questions[0].kind === 'music') void preload(questions[0].audio);
-      openLobby({ type, categoryId: catId, subcategoryId: subId, rounds: questions.length, roundSeconds: seconds, ask, bots }, questions);
+      await createRoom({ type, categoryId: catId, subcategoryId: subId, rounds: questions.length, roundSeconds: seconds, ask, bots }, questions);
     } catch {
       setError('В этой подборке не нашлось вопросов. Выберите другую.');
       setBusy(false);
@@ -149,9 +149,9 @@ export function Setup() {
           </div>
         )}
         <div className="field">
-          <span className="label">Соперники-боты</span>
+          <span className="label">Боты в комнате</span>
           <div className="chips">
-            {[1, 2, 3, 4, 5].map((n) => (
+            {[0, 1, 2, 3, 4, 5].map((n) => (
               <button key={n} className="chip" aria-pressed={bots === n} onClick={() => setBots(n)}>{n}</button>
             ))}
           </div>

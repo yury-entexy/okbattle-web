@@ -6,7 +6,7 @@ import { useGame } from '@/lib/game/store';
 import { Avatar } from './Avatar';
 
 export function Home() {
-  const { me, setName, setAvatar, goSetup } = useGame();
+  const { me, setName, setAvatar, goSetup, goJoin, notice } = useGame();
   const [name, setLocalName] = useState(me.name);
 
   useEffect(() => {
@@ -14,7 +14,9 @@ export function Home() {
       const saved = localStorage.getItem('sg.name');
       if (saved) setLocalName(saved);
     } catch {}
-  }, []);
+    // A shared link carries the room code in the hash: go straight to joining.
+    if (/^#\d{6}$/.test(location.hash)) goJoin();
+  }, [goJoin]);
 
   return (
     <>
@@ -60,13 +62,23 @@ export function Home() {
             ))}
           </div>
         </div>
-        <button className="btn block" type="submit">Создать игру</button>
+        <div className="row">
+          <button className="btn" style={{ flex: 1 }} type="submit">Создать игру</button>
+          <button
+            className="btn secondary"
+            style={{ flex: 1 }}
+            type="button"
+            onClick={() => {
+              setName(name.trim() || 'Игрок');
+              goJoin();
+            }}
+          >
+            Войти по коду
+          </button>
+        </div>
       </form>
 
-      <p className="notice">
-        Веб-версия: игра против ботов на вопросах и треках из базы приложения. Вход по коду с телефона
-        подключим следующим этапом.
-      </p>
+      {notice && <p className="notice" role="alert">{notice}</p>}
     </>
   );
 }

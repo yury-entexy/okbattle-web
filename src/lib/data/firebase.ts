@@ -1,4 +1,3 @@
-import { initializeApp } from 'firebase/app';
 import {
   collection,
   getDocs,
@@ -9,15 +8,10 @@ import {
   type DocumentData,
 } from 'firebase/firestore/lite';
 import type { Category, GameType, Locale, Localized, Question } from '@/lib/types';
+import { firebaseApp } from '@/lib/firebase-app';
 import { pickRandom, type DataSource } from './source';
 
-// Same Firebase project as the mobile app, so web and mobile share categories and questions.
-const app = initializeApp({
-  apiKey: process.env.NEXT_PUBLIC_FIREBASE_API_KEY,
-  projectId: process.env.NEXT_PUBLIC_FIREBASE_PROJECT_ID ?? 'sound-guess-95889',
-  appId: process.env.NEXT_PUBLIC_FIREBASE_APP_ID,
-});
-const db = getFirestore(app);
+const db = getFirestore(firebaseApp());
 
 const CATEGORIES: Record<GameType, string> = { music: 'Categories', quiz: 'CommonQuestionCategories' };
 const QUESTIONS: Record<GameType, string> = { music: 'Sounds', quiz: 'CommonQuestions' };

@@ -2,79 +2,94 @@
 
 import { useEffect, useState } from 'react';
 import { play, preload, sfx, stop } from '@/lib/audio';
-import { ME } from '@/lib/game/engine';
-import { REVEAL_MS, useGame } from '@/lib/game/store';
+import { COUNTDOWN_MS, REVEAL_MS, isHost, useGame, visibleAnswers } from '@/lib/game/store';
+import { roundKey } from '@/lib/room/types';
 import { Avatar } from './Avatar';
 
+/** Re-renders every frame with the shared (server) clock; the host also advances the game here. */
 function useFrame(): number {
-  const tick = useGame((s) => s.tick);
-  const [now, setNow] = useState(() => performance.now());
+  const { drive, now } = useGame();
+  const [t, setT] = useState(now);
   useEffect(() => {
     let raf = 0;
-    const loop = (t: number) => {
-      tick(t);
-      setNow(t);
+    const loop = () => {
+      drive();
+      setT(now());
       raf = requestAnimationFrame(loop);
     };
     raf = requestAnimationFrame(loop);
-    // rAF sleeps in background tabs; a slow interval keeps the game moving there.
-    const bg = setInterval(() => document.hidden && tick(performance.now()), 500);
+    // rAF sleeps in background tabs; a slow interval keeps the host's game moving there.
+    const bg = setInterval(() => document.hidden && drive(), 500);
     return () => {
       cancelAnimationFrame(raf);
       clearInterval(bg);
     };
-  }, [tick]);
-  return now;
+  }, [drive, now]);
+  return t;
 }
 
 export function Play() {
   const now = useFrame();
-  const { phase, phaseAt, index, rounds, players, answers, settings, answer, goHome } = useGame();
-  const round = rounds[index];
-  const q = round.question;
-  const roundMs = (settings?.roundSeconds ?? 30) * 1000;
-  const mine = answers[index]?.[ME];
+  const { room, me, answer, goHome } = useGame();
+  const host = useGame(isHost);
+  const stage = room?.stage;
+  const index = room?.index ?? 0;
+  const q = room?.rounds[index]?.question;
 
   useEffect(() => {
-    if (phase === 'question' && q.kind === 'music') {
+    if (!room || !q) return;
+    if (stage === 'question' && q.kind === 'music') {
       void play(q.audio);
-      const next = rounds[index + 1]?.question;
+      const next = room.rounds[index + 1]?.question;
       if (next?.kind === 'music') void preload(next.audio);
     }
-    if (phase === 'countdown') stop();
-  }, [phase, q, rounds, index]);
+    if (stage === 'countdown') {
+      stop();
+      if (q.kind === 'music') void preload(q.audio);
+    }
+    // Only the stage change matters here, not every room update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [stage, index]);
 
   useEffect(() => () => stop(), []);
 
-  if (phase === 'countdown') {
-    const left = Math.max(1, Math.ceil((3000 - (now - phaseAt)) / 1000));
+  if (!room || !q) return null;
+  const round = room.rounds[index];
+  const elapsed = now - room.stageAt;
+
+  if (stage === 'countdown') {
+    const left = Math.max(1, Math.ceil((COUNTDOWN_MS - elapsed) / 1000));
     return (
       <div className="countdown" aria-live="polite">
         <div style={{ display: 'grid', justifyItems: 'center', gap: 8 }}>
-          <p>Раунд {index + 1} из {rounds.length}</p>
+          <p>Раунд {index + 1} из {room.rounds.length}</p>
           <b key={left}>{left}</b>
         </div>
       </div>
     );
   }
 
-  const elapsed = now - phaseAt;
-  const remaining = phase === 'question' ? Math.max(0, roundMs - elapsed) : 0;
+  const roundMs = room.settings.roundSeconds * 1000;
+  const remaining = stage === 'question' ? Math.max(0, roundMs - elapsed) : 0;
   const fraction = remaining / roundMs;
-  const revealed = phase === 'reveal';
+  const revealed = stage === 'reveal';
+  const shown = visibleAnswers(room, now);
+  const mine = room.answers?.[roundKey(index)]?.[me.id];
+  const players = Object.values(room.players).sort((a, b) => a.joinedAt - b.joinedAt);
+  const others = players.filter((p) => p.id !== me.id);
   const correctIndex = round.options.findIndex((o) => o.correct);
-  const whoPicked = (i: number) => players.filter((p) => answers[index]?.[p.id]?.option === i);
+  const whoPicked = (i: number) => players.filter((p) => shown[p.id]?.option === i);
 
   return (
     <>
       <header className="status">
         <button className="icon-btn" onClick={goHome} aria-label="Выйти из игры">✕</button>
-        <span className="round">Раунд {index + 1}/{rounds.length}</span>
+        <span className="round">Раунд {index + 1}/{room.rounds.length}</span>
         <div className="opponents" aria-label="Соперники">
-          {players.filter((p) => p.bot).map((p) => (
+          {others.slice(0, 5).map((p) => (
             <div key={p.id} className="opponent" title={p.name}>
               <Avatar name={p.avatar} size={32} />
-              {answers[index]?.[p.id] && <span className="done" aria-label="ответил" />}
+              {shown[p.id] && <span className="done" aria-label="ответил" />}
             </div>
           ))}
         </div>
@@ -96,11 +111,7 @@ export function Play() {
             <div className={`disc ${!revealed ? 'spin' : ''}`}>
               {revealed && q.photo ? <img src={q.photo} alt="" /> : <div className="bars" aria-hidden><i /><i /><i /><i /></div>}
             </div>
-            {revealed ? (
-              <p className="prompt">{q.author} — {q.title}</p>
-            ) : (
-              <p className="prompt">{round.prompt}</p>
-            )}
+            <p className="prompt">{revealed ? `${q.author} — ${q.title}` : round.prompt}</p>
           </>
         ) : (
           <>
@@ -146,7 +157,10 @@ export function Play() {
           <span style={{ opacity: 0.8 }}>дальше через {Math.max(0, Math.ceil((REVEAL_MS - elapsed) / 1000))}</span>
         </p>
       )}
-      {phase === 'question' && mine && <p className="reveal-line" style={{ color: '#fff' }}>Ответ принят. Ждём остальных…</p>}
+      {stage === 'question' && mine && <p className="reveal-line" style={{ color: '#fff' }}>Ответ принят. Ждём остальных…</p>}
+      {!host && stage === 'question' && !mine && remaining === 0 && (
+        <p className="reveal-line" style={{ color: '#fff' }}>Ждём ведущего…</p>
+      )}
     </>
   );
 }

@@ -2,18 +2,21 @@
 
 import { useEffect } from 'react';
 import { stop } from '@/lib/audio';
-import { ME, standings } from '@/lib/game/engine';
-import { useGame } from '@/lib/game/store';
+import { standings } from '@/lib/game/engine';
+import { answersByRound, isHost, useGame } from '@/lib/game/store';
 import { Avatar } from './Avatar';
 
 export function Final() {
-  const { players, answers, rounds, replay, goHome } = useGame();
-  const table = standings(players, answers);
-  const top = table.slice(0, 3);
-  const myPlace = table.findIndex((s) => s.player.id === ME) + 1;
+  const { room, me, goSetup, goHome } = useGame();
+  const host = useGame(isHost);
 
   useEffect(() => stop(1200), []);
+  if (!room) return null;
 
+  const players = Object.values(room.players);
+  const table = standings(players, answersByRound(room));
+  const top = table.slice(0, 3);
+  const myPlace = table.findIndex((s) => s.player.id === me.id) + 1;
   // Podium order: 2nd, 1st, 3rd.
   const podium = [top[1], top[0], top[2]];
   const heights = [84, 112, 64];
@@ -21,7 +24,7 @@ export function Final() {
   return (
     <>
       <header className="topbar">
-        <h1>{myPlace === 1 ? 'Победа! Вам достаётся нота' : `Вы на ${myPlace}-м месте`}</h1>
+        <h1>{myPlace === 1 ? 'Победа! Вам достаётся нота' : myPlace ? `Вы на ${myPlace}-м месте` : 'Итоги игры'}</h1>
       </header>
 
       <section className="podium" aria-label="Пьедестал">
@@ -40,10 +43,10 @@ export function Final() {
       </section>
 
       <section className="card">
-        <p className="label">Итоги · {rounds.length} раундов</p>
+        <p className="label">Итоги · {room.rounds.length} раундов</p>
         <div className="table">
           {table.map((s, i) => (
-            <div key={s.player.id} className={`line ${s.player.id === ME ? 'me' : ''}`}>
+            <div key={s.player.id} className={`line ${s.player.id === me.id ? 'me' : ''}`}>
               <span className="pos">{i + 1}</span>
               <Avatar name={s.player.avatar} size={36} />
               <span className="n">{s.player.name}</span>
@@ -58,7 +61,18 @@ export function Final() {
       </section>
 
       <div className="row">
-        <button className="btn" style={{ flex: 1 }} onClick={replay}>Сыграть ещё</button>
+        {host && (
+          <button
+            className="btn"
+            style={{ flex: 1 }}
+            onClick={() => {
+              goHome();
+              goSetup();
+            }}
+          >
+            Новая игра
+          </button>
+        )}
         <button className="btn secondary" style={{ flex: 1 }} onClick={goHome}>В меню</button>
       </div>
     </>
