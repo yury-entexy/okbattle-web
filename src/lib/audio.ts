@@ -4,7 +4,22 @@
 // with sound on the first frame instead of waiting on an <audio> element to buffer.
 let ctx: AudioContext | null = null;
 const buffers = new Map<string, Promise<AudioBuffer | null>>();
+// Fallback for hosts without CORS headers (the app's Storage bucket has none): a plain <audio>
+// element can play cross-origin files that fetch() is not allowed to read.
+const elements = new Map<string, HTMLAudioElement>();
 let playing: { source: AudioBufferSourceNode; gain: GainNode } | null = null;
+let playingElement: HTMLAudioElement | null = null;
+
+function element(url: string): HTMLAudioElement {
+  let el = elements.get(url);
+  if (!el) {
+    el = new Audio();
+    el.preload = 'auto';
+    el.src = url;
+    elements.set(url, el);
+  }
+  return el;
+}
 
 function context(): AudioContext {
   ctx ??= new AudioContext();
@@ -23,7 +38,10 @@ export function preload(url: string): Promise<AudioBuffer | null> {
     p = fetch(url)
       .then((r) => (r.ok ? r.arrayBuffer() : Promise.reject(new Error(String(r.status)))))
       .then((data) => context().decodeAudioData(data))
-      .catch(() => null);
+      .catch(() => {
+        element(url);
+        return null;
+      });
     buffers.set(url, p);
   }
   return p;
@@ -32,7 +50,14 @@ export function preload(url: string): Promise<AudioBuffer | null> {
 export async function play(url: string, volume = 1): Promise<void> {
   stop();
   const buffer = await preload(url);
-  if (!buffer) return;
+  if (!buffer) {
+    const el = element(url);
+    el.volume = volume;
+    el.currentTime = 0;
+    playingElement = el;
+    await el.play().catch(() => {});
+    return;
+  }
   const c = context();
   const gain = c.createGain();
   gain.gain.value = volume;
@@ -44,6 +69,10 @@ export async function play(url: string, volume = 1): Promise<void> {
 }
 
 export function stop(fadeMs = 250): void {
+  if (playingElement) {
+    playingElement.pause();
+    playingElement = null;
+  }
   if (!playing || !ctx) return;
   const { source, gain } = playing;
   playing = null;
