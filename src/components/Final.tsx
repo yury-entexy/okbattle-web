@@ -5,6 +5,7 @@ import { click, stop } from '@/lib/audio';
 import { ETERNAL_FINAL_MS } from '@/lib/game/eternal';
 import { isHost, losers, useGame } from '@/lib/game/store';
 import { punishmentText } from '@/lib/punishments';
+import { SignIn } from './SignIn';
 import { ResultCard, rows, type Row } from './Standings';
 import { ActionButton, AppBar, CloseIcon, ControlBlock, Dialog, GameCode, Header, Lottie, PlayersCounter, RoundButton, ScoreCounter } from './ui';
 
@@ -80,6 +81,7 @@ export function Final() {
           {eternal && (
             <p className="notice">Следующая игра через {Math.max(1, Math.ceil((room.stageAt + ETERNAL_FINAL_MS - now()) / 1000))} сек</p>
           )}
+          {eternal && <SignIn title="Войдите, чтобы сохранить результаты и играть под своим именем" />}
           <p className="results-head">Итоговые результаты<small> Вопрос {room.total} из {room.total}</small></p>
           {table.map((r, i) => <ResultCard key={r.player.id} row={r} me={r.player.id === me.id} byTime={byTime} index={i} />)}
         </div>

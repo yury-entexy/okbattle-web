@@ -49,6 +49,21 @@ saved on their `Users` doc as `utm`. Counters load only when their ids are set o
 Goals sent to all of them: `game_join`, `game_start`, `game_finish`, `sign_up` (Facebook gets
 `GameJoin`, `GameStart`, `GameFinish` and the standard `CompleteRegistration`).
 
+## Sign-in
+
+Google and Apple sign-in work as in the app: the player's `Users/{uid}` doc is keyed by the Firebase
+Auth uid, so one account is one player on the phone and on the web. A player who already has a
+profile from the app keeps its name and avatar. A first sign-in fires the `sign_up` goal.
+
+To turn it on in the Firebase console (project sound-guess-95889):
+
+1. Authentication → Settings → Authorized domains: add `okbattle-web.vercel.app` (and any custom domain).
+2. Authentication → Sign-in method → Apple: add a Services ID for the web, with the return URL
+   `https://sound-guess-95889.firebaseapp.com/__/auth/handler` registered for it in the Apple developer account.
+
+`NEXT_PUBLIC_FIREBASE_AUTH_DOMAIN` overrides the default auth domain; `NEXT_PUBLIC_AUTH_EMULATOR`
+points sign-in at the Auth emulator for tests.
+
 ## Static demo build
 
 `public/data/` holds a snapshot of the catalog (`catalog.json` + `media/`), made by the export script

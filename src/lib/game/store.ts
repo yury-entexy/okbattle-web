@@ -3,7 +3,8 @@
 import { create } from 'zustand';
 import { newVideoUid } from '@/lib/video';
 import { ETERNAL_CODES, guestIdentity, type EternalType } from './eternal';
-import { utm } from '@/lib/analytics';
+import { track, utm } from '@/lib/analytics';
+import type { Provider, SignedIn } from '@/lib/auth';
 import { dataSource } from '@/lib/data/source';
 import { backend } from '@/lib/net';
 import { PRE_ROUND_MS, type Backend, type GameDoc, type LiveAnswer, type LiveGame, type LiveMember } from '@/lib/net/types';
@@ -39,8 +40,13 @@ interface GameState {
   notice: string;
   /** The always-on room this visitor came to from an ad link; they follow it from game to game. */
   eternal: EternalType | null;
+  /** The signed-in account's email, or null for a guest. */
+  account: string | null;
 
   setName(name: string): void;
+  /** After Google or Apple sign-in (the popup must open straight from the tap, so the caller runs it). */
+  signedIn(result: SignedIn, provider: Provider): void;
+  signOut(): Promise<void>;
   setAvatar(avatar: string): void;
   goSetup(): void;
   goJoin(): void;
@@ -96,9 +102,12 @@ function storage(kind: 'local' | 'session') {
   }
 }
 
-/** One id per browser: it names this player's `Users` doc, which the app reads. */
+/** One id per browser: it names this player's `Users` doc, which the app reads. A signed-in player
+ *  goes by their Firebase Auth uid, as in the app. */
 function playerId(): string {
   const store = storage('local');
+  const account = store?.getItem('sg.auth');
+  if (account) return account;
   let id = store?.getItem('sg.uid');
   if (!id || !id.startsWith('web')) {
     id = `web${crypto.randomUUID().replace(/-/g, '').slice(0, 24)}`;
@@ -120,7 +129,7 @@ export function avatarUrl(avatar: string): string {
 /** The visitor's ad tags, kept on their Users doc for attribution. */
 function adTags() {
   const tags = utm();
-  return Object.keys(tags).length ? { utm: tags } : {};
+  return { ...(Object.keys(tags).length ? { utm: tags } : {}), isGuest: !storage('local')?.getItem('sg.auth') };
 }
 
 export const isHost = (s: Pick<GameState, 'room' | 'me'>) => !!s.room && s.room.hostId === s.me.id;
@@ -235,20 +244,42 @@ export const useGame = create<GameState>((set, get) => {
     room: null,
     notice: '',
     eternal: null,
+    account: null,
+
+    signedIn({ account, isNew }, provider) {
+      const store = storage('local');
+      store?.setItem('sg.auth', account.id);
+      store?.setItem('sg.email', account.email);
+      store?.setItem('sg.name', account.name);
+      // A web avatar comes back as its URL: keep it as the picker's name.
+      const avatar = account.avatarUrl.match(/\/avatars\/(\w+)\.webp$/)?.[1] ?? account.avatarUrl;
+      store?.setItem('sg.avatar', avatar);
+      // Mid-game the player keeps their seat; the account's id takes over from the next game.
+      set((s) => ({ account: account.email, notice: '', me: { id: s.room ? s.me.id : account.id, name: account.name, avatar } }));
+      if (isNew) track('sign_up', { method: provider });
+    },
+    async signOut() {
+      const { signOut } = await import('@/lib/auth');
+      await signOut();
+      const store = storage('local');
+      store?.removeItem('sg.auth');
+      store?.removeItem('sg.email');
+      set((s) => ({ account: null, me: { ...s.me, id: s.room ? s.me.id : playerId() } }));
+    },
 
     setName(name) {
       storage('local')?.setItem('sg.name', name);
-      set((s) => ({ me: { ...s.me, name, id: s.me.id || playerId() } }));
+      set((s) => ({ me: { ...s.me, name, id: playerId() } }));
     },
     setAvatar(avatar) {
       storage('local')?.setItem('sg.avatar', avatar);
       set((s) => ({ me: { ...s.me, avatar } }));
     },
     goSetup() {
-      set((s) => ({ screen: 'setup', notice: '', me: { ...s.me, id: s.me.id || playerId(), name: s.me.name === 'Игрок' ? savedName() : s.me.name } }));
+      set((s) => ({ screen: 'setup', notice: '', me: { ...s.me, id: playerId(), name: s.me.name === 'Игрок' ? savedName() : s.me.name } }));
     },
     goJoin() {
-      set((s) => ({ screen: 'join', notice: '', me: { ...s.me, id: s.me.id || playerId() } }));
+      set((s) => ({ screen: 'join', notice: '', me: { ...s.me, id: playerId() } }));
     },
     goHome() {
       const { room, me } = get();
@@ -346,7 +377,7 @@ export const useGame = create<GameState>((set, get) => {
       // A returning visitor keeps their name; a new one plays as a random guest until they sign up.
       const known = !!storage('local')?.getItem('sg.name');
       const guest = known ? null : guestIdentity();
-      const me = { ...s.me, id: s.me.id || playerId(), ...(guest ?? {}) };
+      const me = { ...s.me, id: playerId(), ...(guest ?? {}) };
       if (guest) {
         storage('local')?.setItem('sg.name', guest.name);
         storage('local')?.setItem('sg.avatar', guest.avatar);

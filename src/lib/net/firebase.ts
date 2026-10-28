@@ -66,7 +66,7 @@ export const firebaseBackend: Backend = {
   },
 
   async saveUser(id, user) {
-    await setDoc(doc(firestore, 'Users', id), { ...user, isGuest: true, source: 'web' }, { merge: true });
+    await setDoc(doc(firestore, 'Users', id), { isGuest: true, source: 'web', ...user }, { merge: true });
   },
 
   watch(id, onChange) {

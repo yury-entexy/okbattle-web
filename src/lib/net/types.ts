@@ -91,7 +91,7 @@ export interface Backend {
   createGame(doc: GameDoc): Promise<string>;
   deleteGame(id: string): Promise<void>;
   /** Creates or refreshes the `Users` doc the app reads for every player it shows. */
-  saveUser(id: string, user: { name: string; avatarUrl: string; isBot?: boolean; utm?: Record<string, string | undefined> }): Promise<void>;
+  saveUser(id: string, user: { name: string; avatarUrl: string; isBot?: boolean; isGuest?: boolean; utm?: Record<string, string | undefined> }): Promise<void>;
 
   /** Live node calls; paths are relative to `Games/{id}`. */
   watch(id: string, onChange: (game: LiveGame | null) => void): () => void;

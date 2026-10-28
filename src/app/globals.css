@@ -434,3 +434,12 @@ h1, h2, h3, p { margin: 0; }
   .home-hero { padding: 8px 0 28px; }
   .home-hero img { width: 80px; height: 80px; }
 }
+
+/* Sign-in (AuthScreen) */
+.signin { display: grid; gap: 12px; margin-top: 8px; }
+.signin-title { font-size: 16px; font-weight: 700; text-align: center; color: var(--dark); }
+.signin-btn { display: inline-flex; align-items: center; justify-content: center; gap: 17px; }
+.signin-policy { font-size: 12px; text-align: center; color: var(--dark); line-height: 1.4; }
+.signin-policy a { color: var(--blue); text-decoration: underline; }
+.signed-in { font-size: 14px; text-align: center; color: var(--dark); }
+.link { background: none; border: 0; padding: 0; color: var(--blue); text-decoration: underline; font: inherit; cursor: pointer; }

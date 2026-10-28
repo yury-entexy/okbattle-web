@@ -6,6 +6,7 @@ import { AVATARS } from '@/lib/game/engine';
 import { isEternalType } from '@/lib/game/eternal';
 import { useGame } from '@/lib/game/store';
 import { Avatar } from './Avatar';
+import { SignIn } from './SignIn';
 import { ActionButton, AppBar, Header } from './ui';
 
 /** The app's main page: logo header, «Войти в игру как игрок» and «Создать игру как ведущий». */
@@ -18,7 +19,7 @@ export function Home() {
       const saved = localStorage.getItem('sg.name');
       if (saved) setLocalName(saved);
       const face = localStorage.getItem('sg.avatar');
-      if (face && AVATARS.includes(face)) setAvatar(face);
+      if (face && (AVATARS.includes(face) || /^https?:/.test(face))) setAvatar(face);
     } catch {}
     preloadSounds();
     // An ad link (`?play=music`) goes straight into the always-on room of that game.
@@ -74,6 +75,7 @@ export function Home() {
           {notice && <p className="notice" role="alert">{notice}</p>}
           <ActionButton onClick={() => go(() => { click('next'); goJoin(); })}>Войти в игру как игрок</ActionButton>
           <ActionButton primary onClick={() => go(goSetup)}>Создать игру как ведущий</ActionButton>
+          <SignIn title="Авторизация" />
         </div>
       </div>
     </div>
