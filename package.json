@@ -7,7 +7,8 @@
     "build": "next build",
     "start": "next start",
     "build:demo": "node scripts/build-demo.mjs && node scripts/relativize-export.mjs",
-    "typecheck": "tsc --noEmit"
+    "typecheck": "tsc --noEmit",
+    "test:pool": "tsx scripts/pool-check.ts 20"
   },
   "dependencies": {
     "agora-rtc-sdk-ng": "4.24.8",

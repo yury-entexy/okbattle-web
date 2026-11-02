@@ -54,6 +54,13 @@ server or the game code. The workflow needs the repository secrets `GCP_SA_KEY` 
 key with Cloud Run Admin, Artifact Registry Admin and Service Account User) and `FIREBASE_API_KEY`,
 and the Cloud Run and Artifact Registry APIs enabled in the project.
 
+## «Бильярд»
+
+8-ball pool for two: Create game → «Бильярд» → «Играть с ботом» (runs on the device, no network) or
+«Играть с другом по коду» (an online room at `Games/pool_{code}`, see `docs/billiards-protocol.md`).
+`/?play=billiards` is the ad link: the visitor gets a guest name and is breaking against the bot
+at once. Checks for physics, rules and bot games: `npm run test:pool`.
+
 ## Ad analytics
 
 UTM tags and click ids (`fbclid`, `gclid`, `yclid`) from the landing URL are kept per visitor and

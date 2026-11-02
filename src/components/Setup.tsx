@@ -8,6 +8,7 @@ import { ActionButton, AppBar, BackIcon, BlueScreen, RoundButton } from './ui';
 import { useGame } from '@/lib/game/store';
 import { DurakSetup } from './DurakSetup';
 import { OchoSetup } from './OchoSetup';
+import { BilliardsSetup } from './BilliardsSetup';
 import { PUNISHMENT_KINDS } from '@/lib/punishments';
 import type { Category, GameSettings, GameType } from '@/lib/types';
 
@@ -85,7 +86,7 @@ const DEFAULTS: Omit<GameSettings, 'type' | 'categories' | 'roundSeconds'> = {
 
 export function Setup() {
   const { goHome, createRoom } = useGame();
-  const [type, setType] = useState<GameType | 'durak' | 'ocho'>('music');
+  const [type, setType] = useState<GameType | 'durak' | 'ocho' | 'billiards'>('music');
   const [cats, setCats] = useState<Partial<Record<GameType, Category[]>>>({});
   const [error, setError] = useState('');
   const [open, setOpen] = useState('');
@@ -98,7 +99,7 @@ export function Setup() {
   const lang = textLocale(s.locale);
 
   useEffect(() => {
-    if (type === 'durak' || type === 'ocho' || cats[type]) return;
+    if (type === 'durak' || type === 'ocho' || type === 'billiards' || cats[type]) return;
     let live = true;
     dataSource()
       .then((src) => src.categories(type))
@@ -109,13 +110,13 @@ export function Setup() {
     };
   }, [type, cats]);
 
-  const list = type === 'durak' || type === 'ocho' ? undefined : cats[type];
+  const list = type === 'durak' || type === 'ocho' || type === 'billiards' ? undefined : cats[type];
   const categories = Object.entries(chosen)
     .filter(([, subs]) => subs.length)
     .map(([id, subcategories]) => ({ id, subcategories }));
   const subCount = categories.reduce((n, c) => n + c.subcategories.length, 0);
 
-  function chooseType(t: GameType | 'durak' | 'ocho') {
+  function chooseType(t: GameType | 'durak' | 'ocho' | 'billiards') {
     setType(t);
     setOpen('');
     setChosen({});
@@ -133,7 +134,7 @@ export function Setup() {
   }
 
   async function create() {
-    if (type === 'durak' || type === 'ocho') return;
+    if (type === 'durak' || type === 'ocho' || type === 'billiards') return;
     setBusy(true);
     setError('');
     try {
@@ -176,8 +177,12 @@ export function Setup() {
         <img className="type-icon ocho" src="ui/ocho_game_type.svg" alt="" />
         Очо
       </button>
+      <button className="type-btn" aria-pressed={type === 'billiards'} onClick={() => chooseType('billiards')}>
+        <img className="type-icon billiards" src="ui/billiards_game_type.svg" alt="" />
+        Бильярд
+      </button>
 
-      {type === 'durak' ? <DurakSetup /> : type === 'ocho' ? <OchoSetup /> : <>
+      {type === 'durak' ? <DurakSetup /> : type === 'ocho' ? <OchoSetup /> : type === 'billiards' ? <BilliardsSetup /> : <>
 
       <p className="section-title">Категория {subCount > 0 && `· выбрано подкатегорий: ${subCount}`}</p>
       {!list && !error && <div className="spinner" aria-label="Загрузка" />}

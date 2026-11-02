@@ -602,3 +602,59 @@ button.ocard { cursor: pointer; }
 .ocho-table .opponents { flex-wrap: nowrap; }
 .ocho-table .opp { width: auto; flex: 1 1 0; min-width: 0; max-width: 84px; }
 .dialog:has(.ocho-rules) { max-height: calc(100% - 32px); overflow-y: auto; }
+
+/* «Бильярд» */
+.type-icon.billiards { background: rgba(40, 188, 6, 0.12); }
+.pool-screen .blue-content { display: flex; flex-direction: column; min-height: 100%; }
+.pool { display: flex; flex-direction: column; gap: 8px; padding: 4px 0 16px; flex: 1; }
+.pool-players { position: relative; display: flex; gap: 8px; }
+.pool-player {
+  flex: 1; min-width: 0; display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-radius: 16px;
+  background: rgba(255, 255, 255, 0.14); border: 2px solid transparent; transition: border-color 0.2s, background 0.2s;
+}
+.pool-player.right { flex-direction: row-reverse; text-align: right; }
+.pool-player.turn { border-color: var(--yellow); background: rgba(255, 255, 255, 0.24); }
+.pool-player-info { display: grid; gap: 3px; min-width: 0; }
+.pool-player-name { font-size: 14px; font-weight: 700; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.pool-player.right .pool-group { justify-content: flex-end; }
+.pool-clock { margin-left: auto; font-size: 14px; font-weight: 700; color: var(--yellow); min-width: 22px; text-align: center; }
+.pool-player.right .pool-clock { margin-left: 0; margin-right: auto; }
+.pool-score {
+  position: absolute; left: 50%; top: 50%; transform: translate(-50%, -50%); background: var(--dark-blue);
+  border-radius: 10px; padding: 2px 8px; font-size: 13px; font-weight: 700;
+}
+.pool-group { display: flex; gap: 1px; font-size: 12px; min-height: 14px; overflow: hidden; }
+.pool-group.open { opacity: 0.8; }
+.pool-group i {
+  flex: none; width: 14px; height: 14px; border-radius: 50%; font-style: normal; font-size: 7px; font-weight: 700; line-height: 14px;
+  text-align: center; color: #1a1a1a; background: radial-gradient(circle, #fff 0 35%, var(--c) 37%);
+}
+.pool-group i.stripe { background: radial-gradient(circle, #fff 0 35%, transparent 37%), linear-gradient(#fbfaf4 0 22%, var(--c) 22% 78%, #fbfaf4 78%); }
+.pool-status { text-align: center; font-size: 15px; font-weight: 700; min-height: 40px; display: grid; place-items: center; line-height: 1.25; }
+.pool-status.mine { color: var(--yellow); }
+.pool-box { display: flex; justify-content: center; }
+.pool-canvas { touch-action: none; display: block; border-radius: 14px; box-shadow: 0 8px 22px rgba(26, 56, 90, 0.45); cursor: crosshair; }
+.pool-controls { display: flex; gap: 8px; align-items: stretch; margin-top: 4px; }
+.pool-controls.off { opacity: 0.55; }
+.pool-nudge {
+  width: 48px; flex: none; border: 0; border-radius: 16px; background: var(--blue2); color: #fff; font-size: 28px;
+  font-weight: 700; line-height: 1; cursor: pointer;
+}
+.pool-nudge:disabled { cursor: default; }
+.pool-power {
+  position: relative; flex: 1; height: 52px; border-radius: 16px; background: #fff; overflow: hidden; touch-action: none;
+  cursor: ew-resize; display: grid; place-items: center; user-select: none;
+}
+.pool-power-fill { position: absolute; left: 0; top: 0; bottom: 0; background: linear-gradient(90deg, var(--green), var(--yellow) 60%, var(--red)); }
+.pool-power span { position: relative; color: var(--text-blue); font-size: 13px; font-weight: 700; text-align: center; padding: 0 8px; }
+.pool-result {
+  position: fixed; left: 50%; bottom: 0; transform: translateX(-50%); width: min(100%, 480px); z-index: 20;
+  background: var(--bg); border-radius: 24px 24px 0 0; padding: 20px 16px 28px; display: grid; gap: 10px;
+  justify-items: center; text-align: center; box-shadow: 0 -10px 30px rgba(26, 56, 90, 0.45);
+  animation: pool-up 0.3s ease-out;
+}
+.pool-result h2 { font-size: 26px; }
+.pool-result .abtn { width: 100%; }
+.pool-result-score { font-size: 18px; font-weight: 700; color: var(--yellow); }
+.pool-result .wait-text { margin: 4px 0; }
+@keyframes pool-up { from { transform: translate(-50%, 100%); } }
