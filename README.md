@@ -36,8 +36,10 @@ move on to the next game, which is already running.
 seats, and a new open table takes its place; after a game the same table deals again in 10 s for
 whoever stayed.
 
-One server runs all three: `server/main.ts` starts `eternal-host.ts music`, `eternal-host.ts quiz`
-and `durak-host.ts` as child processes, restarts any that stops, and answers health checks on
+`/?play=ocho` does the same for «Очо» (pointer `Games/ocho_eternal`).
+
+One server runs them all: `server/main.ts` starts `eternal-host.ts music`, `eternal-host.ts quiz`,
+`table-host.ts durak` and `table-host.ts ocho` as child processes, restarts any that stops, and answers health checks on
 `$PORT`. The hosts use the web app's own game code, so rules, bots and timing match the browsers.
 
 ```bash
@@ -66,6 +68,14 @@ Create game → «Дурак»: обычный, подкидной or перев
 mixed. Friends join with the room code like any other game. The rules are pure functions in
 `src/lib/durak/rules.ts` (with the bots in `bot.ts`); the room format, written so the mobile app can
 join the same tables later, is in [docs/durak-protocol.md](docs/durak-protocol.md).
+
+## «Очо»
+
+Create game → «Очо»: a colour-and-number shedding game with the classic rules of the genre (skip,
+reverse, +2, colour change, +4, and the «Очо!» call on the last card), our own name and card design.
+108 cards, 2–6 players, people and bots mixed. Rules in `src/lib/ocho/rules.ts`, bots in `bot.ts`,
+room format in [docs/ocho-protocol.md](docs/ocho-protocol.md). Tests and a bot simulation:
+`npx tsx scripts/ocho-test.ts`.
 
 ## Sign-in
 

@@ -51,6 +51,11 @@ export const humans = (room: DurakRoom) =>
     .filter(([, m]) => !m.bot && !m.left)
     .sort((a, b) => a[1].joinedAt - b[1].joinedAt);
 
+/** A new open ad table, as the server host creates it. */
+export function eternalRoom(code: string, hostId: string, now: number, bots = 3, mode: Mode = 'throwin'): DurakRoom {
+  return { kind: 'durak', code, hostId, mode, bots, status: 'lobby', members: {}, createdAt: now, eternal: true };
+}
+
 /** The write that deals a game: the people in joining order with the bots spread between them. */
 export function startPatch(room: DurakRoom, now: number, avatarUrl: (a: string) => string): Record<string, unknown> | null {
   const people = humans(room).slice(0, MAX_PLAYERS);

@@ -1,34 +1,55 @@
 /**
- * Server host for the «Дурак» ad tables (`/?play=durak`). It keeps one open table and publishes its
- * code at `Games/durak_eternal`; visitors sit down there. A table deals 4 s after the first person
- * sits down (at once when it is full) with bots filling the empty seats, and a new open table takes
- * its place. After a game the same table deals again in 10 s for whoever stayed, and closes once
- * everyone has left. The referee is the same code a browser host runs (src/lib/durak/room.ts).
+ * Server host for the card-game ad tables: `/?play=durak` and `/?play=ocho`. It keeps one open
+ * table per game and publishes its code at `Games/{game}_eternal`; visitors sit down there. A table
+ * deals 4 s after the first person sits down (at once when it is full) with bots filling the empty
+ * seats, and a new open table takes its place. After a game the same table deals again in 10 s for
+ * whoever stayed, and closes once everyone has left. The referee is the same code a browser host
+ * runs (src/lib/{game}/room.ts).
  *
- *   npx tsx server/durak-host.ts
+ *   npx tsx server/table-host.ts durak|ocho
  *
- * Env as for eternal-host.ts; DURAK_MODE (classic | throwin | transfer, default throwin) and
- * DURAK_BOTS (default 3).
+ * Env as for eternal-host.ts; DURAK_MODE (classic | throwin | transfer, default throwin),
+ * DURAK_BOTS and OCHO_BOTS (default 3).
  */
 import type { Backend } from '../src/lib/net/types';
 import type { Mode } from '../src/lib/durak/rules';
 
-const HOST = 'webhostdurak';
-const POINTER = 'durak_eternal';
+type Game = 'durak' | 'ocho';
+const GAME = process.argv[2] as Game;
+if (GAME !== 'durak' && GAME !== 'ocho') throw new Error('usage: table-host.ts durak|ocho');
+const HOST = `webhost${GAME}`;
+const POINTER = `${GAME}_eternal`;
 const SEAT_MS = 4000;
 const AGAIN_MS = 10_000;
 const MODE = (process.env.DURAK_MODE as Mode) || 'throwin';
-const BOTS = Number(process.env.DURAK_BOTS ?? 3);
+const BOTS = Number((GAME === 'durak' ? process.env.DURAK_BOTS : process.env.OCHO_BOTS) ?? 3);
 
-const log = (...a: unknown[]) => console.log(new Date().toISOString(), 'durak', ...a);
+/** What the host needs from a game's room module; src/lib/durak/room.ts and src/lib/ocho/room.ts both fit. */
+interface TableRoom {
+  code: string;
+  status: 'lobby' | 'playing' | 'over' | 'closed';
+  nextAt?: number;
+  moves?: Record<string, unknown>;
+}
+interface RoomModule {
+  MAX_PLAYERS: number;
+  nodeId(code: string): string;
+  view(raw: never): TableRoom;
+  humans(room: never): unknown[];
+  eternalRoom(code: string, hostId: string, now: number, bots: number, mode?: Mode): TableRoom;
+  startPatch(room: never, now: number, avatarUrl: (a: string) => string): Record<string, unknown> | null;
+  refereeStep(room: never, now: number, due: Map<string, number>): Record<string, unknown> | null;
+}
+
+const log = (...a: unknown[]) => console.log(new Date().toISOString(), GAME, ...a);
 
 async function main() {
   const { backend } = await import('../src/lib/net');
-  const room = await import('../src/lib/durak/room');
+  const room = (GAME === 'durak' ? await import('../src/lib/durak/room') : await import('../src/lib/ocho/room')) as unknown as RoomModule;
   const { avatarUrl } = await import('../src/lib/game/store');
   const be: Backend = await backend();
 
-  type Table = { room: import('../src/lib/durak/room').DurakRoom | null; unwatch: () => void };
+  type Table = { room: TableRoom | null; unwatch: () => void };
   const tables = new Map<string, Table>();
   const due = new Map<string, number>();
   let open = '';
@@ -36,19 +57,17 @@ async function main() {
   async function newCode() {
     for (;;) {
       const c = String(Math.floor(100000 + Math.random() * 900000));
-      if (!(await be.read(room.nodeId(c))) && !(await be.findGame(c))) return c;
+      if (!(await be.read(`durak_${c}`)) && !(await be.read(`ocho_${c}`)) && !(await be.findGame(c))) return c;
     }
   }
 
   async function openTable() {
     const code = await newCode();
-    const fresh = {
-      kind: 'durak', code, hostId: HOST, mode: MODE, bots: BOTS, status: 'lobby', members: {}, createdAt: be.now(), eternal: true,
-    };
-    await be.update(room.nodeId(code), fresh);
+    const fresh = room.eternalRoom(code, HOST, be.now(), BOTS, MODE);
+    await be.update(room.nodeId(code), fresh as unknown as Record<string, unknown>);
     const table: Table = { room: null, unwatch: () => {} };
     table.unwatch = be.watch(room.nodeId(code), (raw) => {
-      table.room = raw ? room.view(raw as unknown as import('../src/lib/durak/room').DurakRoom) : null;
+      table.room = raw ? room.view(raw as never) : null;
     });
     tables.set(code, table);
     open = code;
@@ -66,7 +85,7 @@ async function main() {
       if (k.startsWith('moves/')) delete next.moves![k.slice(6)];
       else if (!k.includes('/')) next[k] = v === null ? undefined : v;
     }
-    t.room = room.view(next);
+    t.room = room.view(next as never);
   }
 
   function close(code: string) {
@@ -83,7 +102,7 @@ async function main() {
     for (const [code, t] of tables) {
       const r = t.room;
       if (!r) continue;
-      const people = room.humans(r).length;
+      const people = room.humans(r as never).length;
       if (r.status === 'lobby') {
         if (!people) {
           if (r.nextAt) write(code, { nextAt: null });
@@ -91,7 +110,7 @@ async function main() {
         }
         if (!r.nextAt) write(code, { nextAt: now + SEAT_MS });
         else if (now >= r.nextAt || people >= room.MAX_PLAYERS) {
-          const patch = room.startPatch(r, now, avatarUrl);
+          const patch = room.startPatch(r as never, now, avatarUrl);
           if (patch) {
             write(code, patch);
             log('dealt', code, 'people', people);
@@ -105,13 +124,13 @@ async function main() {
         // Everyone left mid-game: nobody is watching the bots play.
         if (!people) close(code);
         else {
-          const patch = room.refereeStep(r, now, due);
+          const patch = room.refereeStep(r as never, now, due);
           if (patch) write(code, patch.state && (patch.state as { over?: boolean }).over ? { ...patch, nextAt: now + AGAIN_MS } : patch);
         }
       } else if (r.status === 'over') {
         if (!r.nextAt) write(code, { nextAt: now + AGAIN_MS });
         else if (now >= r.nextAt) {
-          const patch = people ? room.startPatch(r, now, avatarUrl) : null;
+          const patch = people ? room.startPatch(r as never, now, avatarUrl) : null;
           if (patch) write(code, patch);
           else close(code);
         }

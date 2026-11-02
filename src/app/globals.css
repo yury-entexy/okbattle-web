@@ -521,3 +521,84 @@ button.pcard { cursor: pointer; }
 .durak-over h2 { font-size: 26px; }
 .durak-over .await-list, .durak-over .abtn { width: 100%; }
 .type-icon.durak { background: rgba(250, 107, 98, 0.12); }
+
+/* «Очо» */
+.type-icon.ocho { background: rgba(175, 210, 96, 0.18); }
+.ocard {
+  --cc: var(--dark-blue);
+  position: relative; width: 64px; height: 92px; flex: none; border-radius: 10px; padding: 0; font: inherit; color: #fff;
+  background: var(--cc); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(26, 56, 90, 0.3); overflow: hidden;
+  transition: transform 0.15s ease, box-shadow 0.15s ease, filter 0.15s ease;
+}
+.ocard.small { width: 44px; height: 64px; border-width: 2px; border-radius: 8px; }
+.ocard.c-R, .ocard-ring.c-R, .ocho-color.c-R i, .ocho-color-btn.c-R { --cc: #f0574e; }
+.ocard.c-Y, .ocard-ring.c-Y, .ocho-color.c-Y i, .ocho-color-btn.c-Y { --cc: #f5b82e; }
+.ocard.c-G, .ocard-ring.c-G, .ocho-color.c-G i, .ocho-color-btn.c-G { --cc: #6fbf3a; }
+.ocard.c-B, .ocard-ring.c-B, .ocho-color.c-B i, .ocho-color-btn.c-B { --cc: #3f86d6; }
+.ocard-face { position: absolute; inset: 0; display: grid; place-items: center; }
+.ocard-face b { position: relative; font-size: 40px; font-weight: 700; line-height: 1; text-shadow: 0 2px 0 rgba(0, 0, 0, 0.18); }
+.ocard.small .ocard-face b { font-size: 26px; }
+.ocard-corner { position: absolute; left: 5px; top: 3px; font-size: 13px; font-weight: 700; line-height: 1; }
+.ocard-corner.end { left: auto; top: auto; right: 5px; bottom: 3px; transform: rotate(180deg); }
+.ocard.small .ocard-corner { font-size: 10px; left: 3px; top: 2px; }
+.ocard .u { text-decoration: underline; text-decoration-thickness: 2px; text-underline-offset: 2px; }
+.ocard.small .ocard-corner.end { left: auto; top: auto; right: 3px; bottom: 2px; }
+
+.ocard-face svg { width: 38px; height: 38px; filter: drop-shadow(0 2px 0 rgba(0, 0, 0, 0.18)); }
+.ocard.small .ocard-face svg { width: 24px; height: 24px; }
+.ocard-corner svg { width: 13px; height: 13px; display: block; }
+.ocard.small .ocard-corner svg { width: 10px; height: 10px; }
+.ocard.wild .ocard-face b { font-size: 26px; text-shadow: 0 1px 3px rgba(0, 0, 0, 0.5); }
+.ocard.small.wild .ocard-face b { font-size: 16px; }
+.ocard.back .ocard-face b.logo { font-size: 15px; letter-spacing: 0.5px; }
+.ocard.small.back .ocard-face b.logo { font-size: 10px; }
+.ocard-ring {
+  position: absolute; width: 48px; height: 48px; border-radius: 50%; border: 3px solid #fff;
+  background: conic-gradient(#f0574e 0 25%, #f5b82e 0 50%, #6fbf3a 0 75%, #3f86d6 0);
+}
+.ocard.small .ocard-ring { width: 32px; height: 32px; border-width: 2px; }
+.ocard-ring.named { background: var(--cc); }
+.ocard.back { background: var(--header); }
+.ocard.back .ocard-ring { opacity: 0.9; }
+button.ocard { cursor: pointer; }
+.ocard.playable { z-index: 1; transform: translateY(-12px); box-shadow: 0 0 0 3px var(--yellow), 0 8px 14px rgba(26, 56, 90, 0.35); }
+.ocard.dim::after { content: ''; position: absolute; inset: 0; background: rgba(40, 77, 121, 0.5); }
+
+.ocho-felt { position: relative; justify-content: center; gap: 18px; min-height: 190px; }
+.ocho-deck { position: relative; }
+.ocho-deck .deck-count { left: 50%; transform: translateX(-50%); bottom: -12px; }
+.ocho-pile { position: relative; width: 78px; height: 106px; }
+.ocho-pile .ocard { width: 74px; height: 106px; }
+.ocho-under { position: absolute; inset: 0; transform: rotate(-9deg); opacity: 0.85; }
+.ocho-top { position: absolute; inset: 0; animation: ocho-in 0.28s ease both; }
+@keyframes ocho-in { from { transform: translateY(-28px) rotate(8deg) scale(0.9); opacity: 0; } to { transform: rotate(3deg); opacity: 1; } }
+.ocho-color { display: grid; justify-items: center; gap: 4px; font-size: 12px; font-weight: 700; min-width: 64px; }
+.ocho-color i { width: 30px; height: 30px; border-radius: 50%; background: var(--cc); border: 3px solid #fff; box-shadow: 0 2px 6px rgba(26, 56, 90, 0.3); }
+.ocho-dir { position: absolute; top: 8px; right: 10px; opacity: 0.8; transition: transform 0.3s ease; }
+.ocho-dir.ccw { transform: scaleX(-1); }
+.ocho-last { text-align: center; font-size: 14px; min-height: 18px; opacity: 0.9; }
+.ocho-hand { overflow-x: auto; justify-content: safe center; padding-top: 18px; scrollbar-width: none; }
+.ocho-hand .ocard + .ocard { margin-left: calc(var(--overlap) - 64px); }
+.mini-back.ocho { background: conic-gradient(#f0574e 0 25%, #f5b82e 0 50%, #6fbf3a 0 75%, #3f86d6 0); }
+.opp-role.ocho-call { background: var(--yellow); color: var(--dark); animation: deal 0.25s ease both; }
+.ocho-colors { display: grid; grid-template-columns: 1fr 1fr; gap: 10px; margin-top: 14px; }
+.ocho-color-btn {
+  min-height: 64px; border-radius: 14px; border: 3px solid #fff; background: var(--cc); color: #fff; font: inherit; font-size: 16px;
+  font-weight: 700; box-shadow: 0 2px 8px rgba(26, 56, 90, 0.3); cursor: pointer;
+}
+.ocho-color-btn.best { box-shadow: 0 0 0 3px var(--yellow), 0 2px 8px rgba(26, 56, 90, 0.3); }
+.ocho-rules { display: grid; gap: 10px; font-size: 14px; line-height: 1.4; color: var(--dark); text-align: left; }
+.ocho-rules ul { list-style: none; margin: 0; padding: 0; display: grid; gap: 8px; }
+.ocho-rules li { display: flex; gap: 10px; align-items: center; }
+.await-item.win { background: var(--correct); }
+.rules-q { font-size: 20px; font-weight: 700; line-height: 1; }
+.dialog .ocho-colors, .dialog .ocho-rules { width: 100%; }
+.ocho-call-btn {
+  flex: none; min-width: 96px; min-height: 52px; border-radius: 26px; border: 3px solid #fff; background: var(--yellow); color: var(--dark);
+  font: inherit; font-size: 18px; font-weight: 700; cursor: pointer; animation: ocho-pulse 1s ease-in-out infinite;
+}
+.ocho-call-btn.armed { background: var(--right-green); color: #fff; animation: none; }
+@keyframes ocho-pulse { 50% { box-shadow: 0 0 0 6px rgba(250, 205, 98, 0.35); } }
+.ocho-table .opponents { flex-wrap: nowrap; }
+.ocho-table .opp { width: auto; flex: 1 1 0; min-width: 0; max-width: 84px; }
+.dialog:has(.ocho-rules) { max-height: calc(100% - 32px); overflow-y: auto; }

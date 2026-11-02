@@ -88,7 +88,7 @@ export const useDurak = create<DurakStore>((set, get) => {
       let code = '';
       for (let i = 0; i < 10 && !code; i++) {
         const c = String(Math.floor(100000 + Math.random() * 900000));
-        if (!(await be.read(nodeId(c))) && !(await be.findGame(c))) code = c;
+        if (!(await be.read(nodeId(c))) && !(await be.read(`ocho_${c}`)) && !(await be.findGame(c))) code = c;
       }
       const room: DurakRoom = { kind: 'durak', code, hostId: id, mode, bots, status: 'lobby', members: { [id]: self() }, createdAt: be.now() };
       await be.update(nodeId(code), room as unknown as Record<string, unknown>);
