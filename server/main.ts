@@ -1,5 +1,5 @@
 /**
- * The ad-room server: runs the always-on rooms (music, quiz, «Дурак») as child processes, restarts
+ * The ad-room server: runs the always-on rooms (music, quiz, «Дурак», «Очо») as child processes, restarts
  * any that stops, and answers health checks on $PORT, as Cloud Run expects of a container.
  *
  *   npx tsx server/main.ts
@@ -10,7 +10,8 @@ import { createServer } from 'node:http';
 const ROOMS: Record<string, string[]> = {
   music: ['server/eternal-host.ts', 'music'],
   quiz: ['server/eternal-host.ts', 'quiz'],
-  durak: ['server/durak-host.ts'],
+  durak: ['server/table-host.ts', 'durak'],
+  ocho: ['server/table-host.ts', 'ocho'],
 };
 const only = process.env.ROOMS?.split(',').filter((r) => r in ROOMS);
 

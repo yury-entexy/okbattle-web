@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { click, unlockAudio } from '@/lib/audio';
 import { useGame } from '@/lib/game/store';
 import { useDurak } from '@/lib/durak/store';
+import { useOcho } from '@/lib/ocho/store';
 import { ActionButton, AppBar, BackIcon, BlueScreen, Loader, RoundButton } from './ui';
 
 /** The app's join page: six-digit room code, then «Играть». */
@@ -30,9 +31,10 @@ export function Join() {
             unlockAudio();
             click('next');
             setBusy(true);
-            // «Дурак» rooms first, then the quiz rooms shared with the app.
+            // Card-game rooms first, then the quiz rooms shared with the app.
             const durak = await useDurak.getState().join(code);
-            const ok = durak === 'ok' || (durak === 'none' && (await joinRoom(code)));
+            const ocho = durak === 'none' ? await useOcho.getState().join(code) : 'none';
+            const ok = durak === 'ok' || ocho === 'ok' || (durak === 'none' && ocho === 'none' && (await joinRoom(code)));
             if (!ok) setBusy(false);
           }}
         >
