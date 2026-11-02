@@ -516,3 +516,54 @@ button.pcard { cursor: pointer; }
 .durak-over h2 { font-size: 26px; }
 .durak-over .await-list, .durak-over .abtn { width: 100%; }
 .type-icon.durak { background: rgba(250, 107, 98, 0.12); }
+
+/* «Боулинг» */
+.type-icon.bowling { background: rgba(94, 154, 213, 0.15); }
+.bowl-screen .blue-content { display: flex; flex-direction: column; min-height: 100%; padding-left: 12px; padding-right: 12px; }
+.bowlers { display: flex; gap: 6px; overflow-x: auto; scrollbar-width: none; padding: 4px 0 8px; }
+.bowler {
+  flex: 1 0 auto; min-width: 0; max-width: 50%; display: flex; align-items: center; gap: 6px; padding: 4px 10px 4px 4px;
+  border-radius: 20px; background: rgba(255, 255, 255, 0.14); font-size: 13px; transition: background 0.2s ease;
+}
+.bowler.turn { background: var(--yellow); color: var(--dark); }
+.bowler-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }
+.bowler b { font-size: 15px; }
+.sheet { display: grid; grid-template-columns: repeat(9, minmax(0, 1fr)) minmax(0, 1.45fr); background: #fff; color: var(--dark); border-radius: 12px; overflow: hidden; }
+.sheet-frame { display: grid; grid-template-rows: auto 18px 20px; border-left: 1px solid var(--silver); min-width: 0; }
+.sheet-frame:first-child { border-left: 0; }
+.sheet-n { font-size: 9px; text-align: center; color: var(--grey); padding-top: 2px; line-height: 1; }
+.sheet-rolls { display: flex; justify-content: flex-end; }
+.sheet-rolls i { font-style: normal; font-size: 12px; font-weight: 700; width: 50%; text-align: center; line-height: 18px; border-left: 1px solid var(--silver); border-bottom: 1px solid var(--silver); }
+.tenth .sheet-rolls i { width: 33.3%; }
+.sheet-rolls i:first-child { border-left: 0; }
+.tenth .sheet-rolls i:first-child { border-left: 0; }
+.sheet-rolls i.mark { color: var(--red); }
+.sheet-total { font-size: 13px; font-weight: 700; text-align: center; line-height: 20px; color: var(--text-blue); }
+.lane-wrap { position: relative; flex: 1; min-height: 300px; margin-top: 10px; border-radius: 20px; overflow: hidden; background: #1a385a; }
+.lane { position: absolute; inset: 0; width: 100%; height: 100%; touch-action: none; display: block; cursor: grab; }
+.lane-hud { position: absolute; top: 8px; left: 8px; right: 8px; display: flex; justify-content: space-between; align-items: flex-start; pointer-events: none; }
+.pinmap { width: 54px; height: 44px; background: rgba(15, 36, 60, 0.6); border-radius: 10px; padding: 4px; }
+.pinmap circle.up { fill: #fff; }
+.pinmap circle.down { fill: none; stroke: rgba(255, 255, 255, 0.35); stroke-width: 0.02; }
+.lane-message {
+  position: absolute; left: 50%; top: 72%; transform: translate(-50%, -50%); pointer-events: none;
+  background: var(--yellow); color: var(--dark); font-weight: 700; font-size: 30px; padding: 10px 26px; border-radius: 22px;
+  box-shadow: 0 8px 30px rgba(15, 36, 60, 0.35); animation: lane-pop 0.3s ease both; white-space: nowrap;
+}
+@keyframes lane-pop { from { transform: translate(-50%, -50%) scale(0.6); opacity: 0; } to { transform: translate(-50%, -50%); opacity: 1; } }
+.lane-hint {
+  position: absolute; left: 12px; right: 12px; bottom: 36%; pointer-events: none; background: rgba(15, 36, 60, 0.72);
+  color: #fff; font-size: 13px; text-align: center; border-radius: 14px; padding: 8px 12px;
+}
+.bowl-status { text-align: center; font-size: 16px; font-weight: 700; padding: 10px 0 2px; min-height: 22px; }
+.bowl-status.mine { color: var(--yellow); }
+.bowl-over { position: relative; padding: 10px 4px 24px; display: grid; gap: 12px; justify-items: center; text-align: center; }
+.bowl-over h2 { font-size: 26px; }
+.bowl-over .abtn { width: 100%; }
+.bowl-fireworks { position: absolute; inset: 0 0 auto; height: 260px; pointer-events: none; }
+.bowl-result { width: 100%; background: rgba(255, 255, 255, 0.14); border-radius: 16px; padding: 8px; display: grid; gap: 6px; }
+.bowl-result.me { box-shadow: inset 0 0 0 2px var(--yellow); }
+.bowl-result-head { display: flex; align-items: center; gap: 8px; font-size: 16px; text-align: left; }
+.bowl-result-head b { font-size: 20px; }
+.bowl-place { width: 24px; height: 24px; border-radius: 50%; background: var(--yellow); color: var(--dark); font-weight: 700; display: grid; place-items: center; font-size: 14px; flex: none; }
+.bowl-name { flex: 1; min-width: 0; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; font-weight: 700; }

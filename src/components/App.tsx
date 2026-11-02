@@ -11,6 +11,7 @@ import { Lobby } from './Lobby';
 import { Play } from './Play';
 import { Final } from './Final';
 import { Durak } from './Durak';
+import { Bowling } from './Bowling';
 import { VideoPanel } from './VideoPanel';
 import { BlueScreen, Loader, Snack } from './ui';
 
@@ -96,6 +97,7 @@ export function App() {
       {screen === 'room' && (stage === 'question' || stage === 'answers' || stage === 'results') && <Play />}
       {screen === 'room' && stage === 'final' && <Final />}
       {screen === 'durak' && <Durak />}
+      {screen === 'bowling' && <Bowling />}
     </main>
   );
 }
