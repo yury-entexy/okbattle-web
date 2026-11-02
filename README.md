@@ -36,6 +36,9 @@ move on to the next game, which is already running.
 seats, and a new open table takes its place; after a game the same table deals again in 10 s for
 whoever stayed.
 
+`/?play=bowling` starts a «Боулинг» game against one bot at once. It runs entirely in the browser,
+so it needs no server.
+
 One server runs all three: `server/main.ts` starts `eternal-host.ts music`, `eternal-host.ts quiz`
 and `durak-host.ts` as child processes, restarts any that stops, and answers health checks on
 `$PORT`. The hosts use the web app's own game code, so rules, bots and timing match the browsers.
@@ -66,6 +69,14 @@ Create game → «Дурак»: обычный, подкидной or перев
 mixed. Friends join with the room code like any other game. The rules are pure functions in
 `src/lib/durak/rules.ts` (with the bots in `bot.ts`); the room format, written so the mobile app can
 join the same tables later, is in [docs/durak-protocol.md](docs/durak-protocol.md).
+
+## «Боулинг»
+
+Create game → «Боулинг»: ten frames against 0–3 bots (Новички, Любители, Профи) on one device.
+Move the ball sideways, then swipe up: the swipe's direction aims, its pace sets the speed and a
+curve at the end hooks the ball. Keyboard: arrows move, Space throws straight. The roll is a
+deterministic 2-D simulation (`src/lib/bowling/physics.ts`) drawn in perspective on a canvas
+(`draw.ts`); scoring is in `score.ts`. `npm test` runs the scoring, physics and bot tests.
 
 ## Sign-in
 

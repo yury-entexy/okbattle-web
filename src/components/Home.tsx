@@ -6,6 +6,7 @@ import { AVATARS } from '@/lib/game/engine';
 import { isEternalType } from '@/lib/game/eternal';
 import { useGame } from '@/lib/game/store';
 import { useDurak } from '@/lib/durak/store';
+import { useBowling } from '@/lib/bowling/store';
 import { Avatar } from './Avatar';
 import { SignIn } from './SignIn';
 import { ActionButton, AppBar, Header } from './ui';
@@ -27,6 +28,7 @@ export function Home() {
     const play = new URLSearchParams(location.search).get('play');
     if (isEternalType(play)) void playEternal(play);
     else if (play === 'durak') void useDurak.getState().playEternal();
+    else if (play === 'bowling') useBowling.getState().playAd();
     // A shared link carries the room code in the hash: go straight to joining.
     else if (/^#\d{6}$/.test(location.hash)) goJoin();
   }, [goJoin, setAvatar, playEternal]);
