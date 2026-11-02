@@ -121,9 +121,12 @@ async function main() {
 
   await openTable();
   setInterval(tick, 150);
+  // A heartbeat on the pointer: visitors only trust a table published by a server that is up.
+  setInterval(() => open && void be.update(POINTER, { code: open, at: be.now() }), 5000);
 
   // On shutdown (a new version deploying), close the tables so players go to the next server's table.
   process.on('SIGTERM', async () => {
+    open = '';
     for (const code of [...tables.keys()]) close(code);
     await be.update(POINTER, { code: null });
     setTimeout(() => process.exit(0), 1500);

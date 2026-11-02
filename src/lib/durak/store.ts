@@ -19,6 +19,8 @@ export { MAX_PLAYERS, TURN_MS, type DurakMember, type DurakRoom } from './room';
 
 /** Where the server publishes the open ad table: `{ code }`. */
 export const ETERNAL_POINTER = 'durak_eternal';
+/** The server refreshes the pointer every 5 s; an older one means the server is down. */
+const POINTER_FRESH_MS = 15_000;
 
 interface DurakStore {
   room: DurakRoom | null;
@@ -135,12 +137,15 @@ export const useDurak = create<DurakStore>((set, get) => {
         game.setName(localStorage.getItem('sg.name')!);
       }
       useGame.setState({ eternal: 'durak', screen: 'eternal', notice: '' });
-      while (useGame.getState().eternal === 'durak' && useGame.getState().screen === 'eternal') {
-        const pointer = (await be.read(ETERNAL_POINTER)) as unknown as { code?: string } | null;
-        if (pointer?.code && (await get().join(pointer.code)) === 'ok') return;
-        useGame.setState({ screen: 'eternal', notice: 'Игра вот-вот начнётся…' });
-        await sleep(2000);
-      }
+      // The server's open table, if the ad-room server is up (it refreshes the pointer every few seconds).
+      const pointer = (await be.read(ETERNAL_POINTER)) as unknown as { code?: string; at?: number } | null;
+      const live = pointer?.code && be.now() - (pointer.at ?? 0) < POINTER_FRESH_MS;
+      if (live && (await get().join(pointer.code!)) === 'ok') return;
+      if (useGame.getState().eternal !== 'durak') return;
+      // No server table: the visitor's own browser hosts a table with bots and deals at once.
+      await get().create('throwin', 3);
+      for (let i = 0; i < 100 && !get().room; i++) await sleep(50);
+      get().start();
     },
 
     setOptions(patch) {

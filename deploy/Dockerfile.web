@@ -1,0 +1,24 @@
+# The site as a container, for hosting it on our own server next to the ad-room server.
+FROM node:22-slim AS build
+WORKDIR /app
+COPY package.json package-lock.json ./
+RUN npm ci --ignore-scripts
+COPY . .
+ARG NEXT_PUBLIC_FIREBASE_API_KEY
+ARG NEXT_PUBLIC_FIREBASE_PROJECT_ID=sound-guess-95889
+ARG NEXT_PUBLIC_FB_PIXEL_ID=
+ARG NEXT_PUBLIC_GA4_ID=
+ARG NEXT_PUBLIC_GOOGLE_ADS_ID=
+ARG NEXT_PUBLIC_YM_ID=
+ENV NEXT_PUBLIC_DATA_SOURCE=firebase NEXT_STANDALONE=1 NEXT_TELEMETRY_DISABLED=1
+RUN npx next build
+
+FROM node:22-slim
+WORKDIR /app
+ENV NODE_ENV=production PORT=3000 HOSTNAME=0.0.0.0
+COPY --from=build /app/.next/standalone ./
+COPY --from=build /app/.next/static ./.next/static
+COPY --from=build /app/public ./public
+USER node
+EXPOSE 3000
+CMD ["node", "server.js"]

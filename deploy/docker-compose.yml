@@ -1,0 +1,25 @@
+# OK Battle on our own server: the site and the ad-room server. Caddy in front (see Caddyfile).
+#   cd /srv/apps/okbattle && docker compose up -d --build
+# .env next to this file: NEXT_PUBLIC_FIREBASE_API_KEY=..., SITE_URL=https://<domain>/
+services:
+  web:
+    build:
+      context: ..
+      dockerfile: deploy/Dockerfile.web
+      args:
+        NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+    restart: unless-stopped
+    ports: ["127.0.0.1:3100:3000"]
+  ad-rooms:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+    restart: unless-stopped
+    stop_grace_period: 10s
+    environment:
+      NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
+      NEXT_PUBLIC_FIREBASE_PROJECT_ID: sound-guess-95889
+      SITE_URL: ${SITE_URL}
+    healthcheck:
+      test: ["CMD", "node", "-e", "fetch('http://127.0.0.1:8080').then(r=>process.exit(r.ok?0:1),()=>process.exit(1))"]
+      interval: 30s
