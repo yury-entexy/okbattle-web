@@ -1,5 +1,5 @@
 # Add to the server's Caddyfile; Caddy gets the certificate itself.
 okbattle.91-203-71-99.sslip.io {
 	encode zstd gzip
-	reverse_proxy 127.0.0.1:3100
+	reverse_proxy 127.0.0.1:3300
 }

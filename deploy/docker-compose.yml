@@ -1,16 +1,18 @@
 # OK Battle on our own server: the site and the ad-room server. Caddy in front (see Caddyfile).
-#   cd /srv/apps/okbattle && docker compose up -d --build
+#   cd /srv/apps/okbattle/deploy && docker compose up -d --build
 # .env next to this file: NEXT_PUBLIC_FIREBASE_API_KEY=..., SITE_URL=https://<domain>/
 services:
   web:
+    container_name: okbattle-web
     build:
       context: ..
       dockerfile: deploy/Dockerfile.web
       args:
         NEXT_PUBLIC_FIREBASE_API_KEY: ${NEXT_PUBLIC_FIREBASE_API_KEY}
     restart: unless-stopped
-    ports: ["127.0.0.1:3100:3000"]
+    ports: ["127.0.0.1:3300:3000"]
   ad-rooms:
+    container_name: okbattle-ad-rooms
     build:
       context: ..
       dockerfile: Dockerfile
