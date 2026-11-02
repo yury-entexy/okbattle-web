@@ -464,11 +464,12 @@ h1, h2, h3, p { margin: 0; }
 .opp-name { font-size: 12px; font-weight: 700; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
 .opp-cards { font-size: 12px; display: inline-flex; align-items: center; gap: 4px; }
 .mini-back { width: 10px; height: 14px; border-radius: 2px; background: var(--header); border: 1px solid #fff; }
-.opp-role { font-size: 10px; font-weight: 700; background: #fff; color: var(--dark-blue); border-radius: 10px; padding: 1px 6px; }
+.opp-role { font-size: 10px; line-height: 14px; height: 16px; font-weight: 700; background: #fff; color: var(--dark-blue); border-radius: 10px; padding: 1px 6px; white-space: nowrap; }
+.opp-role.none { visibility: hidden; }
 .opp-role.def { background: var(--yellow); color: var(--dark); }
 
 .felt {
-  flex: 1; min-height: 210px; display: flex; gap: 10px; align-items: center; padding: 12px 10px; border-radius: 24px;
+  flex: 1; min-height: 220px; display: flex; gap: 10px; align-items: center; padding: 12px 10px; border-radius: 24px;
   background: rgba(40, 77, 121, 0.22); box-shadow: inset 0 0 0 1px rgba(255, 255, 255, 0.25);
 }
 .deck { position: relative; width: 70px; height: 96px; flex: none; }
@@ -480,11 +481,12 @@ h1, h2, h3, p { margin: 0; }
 }
 .deck-suit { font-size: 46px; display: grid; place-items: center; height: 100%; color: #fff; }
 .deck-suit.red { color: #ffd2cd; }
-.table-cards { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); gap: 16px 6px; justify-items: center; align-content: center; }
-.pair { position: relative; width: 54px; height: 78px; animation: deal 0.25s ease both; }
+/* Two fixed rows for up to six pairs: a new pair never moves the ones already on the table. */
+.table-cards { flex: 1; display: grid; grid-template-columns: repeat(3, 1fr); grid-template-rows: repeat(2, 92px); gap: 12px 6px; justify-items: center; align-content: center; }
+.pair { position: relative; width: 66px; height: 92px; animation: deal 0.25s ease both; }
 .pair.target .pcard { box-shadow: 0 0 0 3px var(--yellow); cursor: pointer; }
 .pair-d { position: absolute; left: 12px; top: 14px; animation: deal 0.25s ease both; }
-.table-empty { grid-column: 1 / -1; font-size: 14px; opacity: 0.85; }
+.table-empty { grid-column: 1 / -1; grid-row: 1 / -1; align-self: center; font-size: 14px; opacity: 0.85; }
 @keyframes deal { from { transform: translateY(-14px) scale(0.9); opacity: 0; } to { transform: none; opacity: 1; } }
 
 .pcard {
@@ -501,16 +503,19 @@ h1, h2, h3, p { margin: 0; }
 .pcard.back { background: var(--header); border: 3px solid #fff; display: grid; place-items: center; }
 .pcard.back img { width: 60%; opacity: 0.9; }
 button.pcard { cursor: pointer; }
-.pcard.playable { transform: translateY(-10px); box-shadow: 0 6px 12px rgba(26, 56, 90, 0.35); }
-.pcard.selected { transform: translateY(-18px); box-shadow: 0 0 0 3px var(--yellow), 0 8px 14px rgba(26, 56, 90, 0.35); }
+/* Playable cards are marked in place; only the card the player tapped lifts. */
+.pcard.playable { box-shadow: 0 0 0 2px #fff, 0 0 0 4px rgba(250, 205, 98, 0.8); }
+.pcard.selected { transform: translateY(-14px); box-shadow: 0 0 0 3px var(--yellow), 0 8px 14px rgba(26, 56, 90, 0.35); }
 .pcard.dim { filter: brightness(0.85) saturate(0.7); }
 
-.durak-status { text-align: center; font-size: 16px; font-weight: 700; min-height: 22px; }
+.durak-status { height: 42px; margin: 0; display: flex; align-items: center; justify-content: center; gap: 6px; text-align: center; font-size: 16px; line-height: 21px; font-weight: 700; }
+.durak-status > span { display: -webkit-box; -webkit-line-clamp: 2; -webkit-box-orient: vertical; overflow: hidden; }
+.durak-timer { flex: none; width: 36px; text-align: left; font-variant-numeric: tabular-nums; }
 .durak-status.mine { color: var(--yellow); }
 .durak-status small { font-weight: 400; color: #fff; }
-.hand { display: flex; justify-content: center; padding: 14px 0 4px; }
+.hand { display: flex; justify-content: center; height: 112px; padding: 16px 0 4px; flex: none; }
 .hand .pcard + .pcard { margin-left: calc(var(--overlap) - 64px); }
-.durak-actions { display: flex; gap: 10px; }
+.durak-actions { display: flex; gap: 10px; height: 52px; flex: none; }
 .durak-actions .abtn { min-height: 52px; }
 .durak-over { padding: 20px 16px 30px; display: grid; gap: 12px; justify-items: center; text-align: center; }
 .durak-over h2 { font-size: 26px; }

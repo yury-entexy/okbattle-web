@@ -233,7 +233,8 @@ function Table({ room, me }: { room: DurakRoom; me: string }) {
               <span className="opp-cards">
                 <span className="mini-back" aria-hidden />{s.hands[id]?.length ?? 0}
               </span>
-              {r && <span className={`opp-role ${r === 'Отбивается' || r === 'Берёт' ? 'def' : ''}`}>{r}</span>}
+              {/* The badge's line is always there, so a tile keeps its height when the role changes. */}
+              <span className={`opp-role ${!r ? 'none' : r === 'Отбивается' || r === 'Берёт' ? 'def' : ''}`}>{r || '\u00a0'}</span>
             </div>
           );
         })}
@@ -262,7 +263,10 @@ function Table({ room, me }: { room: DurakRoom; me: string }) {
         </div>
       </div>
 
-      <p className={`durak-status ${myTurn ? 'mine' : ''}`}>{status}{myTurn && !s.over && <small> · {Math.ceil(left / 1000)} с</small>}</p>
+      <p className={`durak-status ${myTurn ? 'mine' : ''}`}>
+        <span>{status}</span>
+        <small className="durak-timer">{myTurn && !s.over ? `${Math.ceil(left / 1000)} с` : ''}</small>
+      </p>
 
       {playing && (
         <div className="hand" style={{ ['--overlap' as string]: `${overlap}px` }}>
@@ -277,6 +281,7 @@ function Table({ room, me }: { room: DurakRoom; me: string }) {
         </div>
       )}
 
+      {/* Always on screen with a fixed height: buttons coming and going must not move the cards. */}
       {playing && (
         <div className="durak-actions">
           {defending && selected && canTransfer(s, me, selected) && (
