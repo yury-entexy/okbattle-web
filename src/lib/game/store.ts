@@ -24,7 +24,7 @@ import {
   type Room,
 } from './engine';
 
-export type Screen = 'home' | 'setup' | 'join' | 'eternal' | 'room' | 'durak' | 'ocho';
+export type Screen = 'home' | 'setup' | 'join' | 'eternal' | 'room' | 'durak' | 'ocho' | 'pool';
 
 interface Me {
   id: string;
@@ -39,7 +39,7 @@ interface GameState {
   /** Set when the game ended under a guest (host left) or a join failed. */
   notice: string;
   /** The always-on room this visitor came to from an ad link; they follow it from game to game. */
-  eternal: EternalType | 'durak' | 'ocho' | null;
+  eternal: EternalType | 'durak' | 'ocho' | 'billiards' | null;
   /** The signed-in account's email, or null for a guest. */
   account: string | null;
 
@@ -189,7 +189,7 @@ export const useGame = create<GameState>((set, get) => {
       if (!live || live.currentEvent === 'master_left') {
         // In an always-on room the next game is already running: move on to it.
         const ad = get().eternal;
-        const again = isHost(get()) || ad === 'durak' || ad === 'ocho' ? null : ad;
+        const again = isHost(get()) || ad === 'durak' || ad === 'ocho' || ad === 'billiards' ? null : ad;
         leave(isHost(get()) || again ? '' : 'Ведущий завершил игру.');
         if (again) void get().playEternal(again);
         return;

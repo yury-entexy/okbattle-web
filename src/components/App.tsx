@@ -12,6 +12,7 @@ import { Play } from './Play';
 import { Final } from './Final';
 import { Durak } from './Durak';
 import { Ocho } from './Ocho';
+import { Billiards } from './Billiards';
 import { VideoPanel } from './VideoPanel';
 import { BlueScreen, Loader, Snack } from './ui';
 
@@ -98,6 +99,7 @@ export function App() {
       {screen === 'room' && stage === 'final' && <Final />}
       {screen === 'durak' && <Durak />}
       {screen === 'ocho' && <Ocho />}
+      {screen === 'pool' && <Billiards />}
     </main>
   );
 }
